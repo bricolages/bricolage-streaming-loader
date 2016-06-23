@@ -1,0 +1,9 @@
+CREATE TABLE strload_tasks (
+  task_seq bigserial
+  , task_class varchar(36) NOT NULL
+  , schema_name varchar(128) NOT NULL
+  , table_name varchar(128) NOT NULL
+  , submit_time timestamp with time zone NOT NULL
+  , CONSTRAINT strload_tasks_pkey PRIMARY KEY (task_seq)
+)
+;

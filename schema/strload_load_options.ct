@@ -1,0 +1,5 @@
+CREATE TABLE strload_load_options (
+  idx integer
+  , load_option jsonb NOT NULL
+  , CONSTRAINT strload_load_options_pkey PRIMARY KEY (idx)
+);

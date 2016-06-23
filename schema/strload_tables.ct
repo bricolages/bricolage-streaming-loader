@@ -1,0 +1,14 @@
+CREATE TABLE strload_tables (
+  schema_name character varying(128)
+  , table_name character varying(128)
+  , data_source_id character varying(256) UNIQUE NOT NULL
+  , load_batch_size integer NOT NULL
+  , load_interval integer NOT NULL
+  , disabled boolean DEFAULT false NOT NULL
+  , ds_idx integer DEFAULT 0 NOT NULL
+  , ctl_ds_idx integer DEFAULT 1 NOT NULL
+  , use_work_table boolean DEFAULT false NOT NULL
+  , use_sql_file boolean DEFAULT false NOT NULL
+  , load_options integer DEFAULT 0 NOT NULL
+  , CONSTRAINT strlaod_tables_pkey PRIMARY KEY (schema_name, table_name)
+);

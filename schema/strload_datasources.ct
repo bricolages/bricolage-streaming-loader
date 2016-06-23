@@ -1,0 +1,5 @@
+CREATE TABLE strload_datasources (
+  idx integer
+  , ds_name varchar(32) NOT NULL
+  , CONSTRAINT strload_datasources_pkey PRIMARY KEY (idx)
+);
