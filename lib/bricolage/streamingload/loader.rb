@@ -24,8 +24,8 @@ module Bricolage
       end
 
       def execute
-        @job_seq = assign_task
-        return unless @job_seq # task already executed by other loader
+        @job_id = assign_task
+        return unless @job_id # task already executed by other loader
         @params.ds.open {|conn|
           @connection = conn
           do_load
@@ -34,34 +34,34 @@ module Bricolage
 
       def assign_task
         @ctl_ds.open {|conn|
-          job_seq = conn.query_value(<<-EndSQL)
+          job_id = conn.query_value(<<-EndSQL)
             insert into strload_jobs
-                ( task_seq
+                ( task_id
                 , process_id
                 , status
                 , start_time
                 )
             select
-                task_seq
+                task_id
                 , '#{@process_id}'
                 , 'running'
                 , current_timestamp
             from
                 strload_tasks
             where
-                task_seq = #{@params.task_seq}
-                and (task_seq not in (select task_seq from strload_jobs) or #{@params.rerun})
-            returning job_seq
+                task_id = #{@params.task_id}
+                and (task_id not in (select task_id from strload_jobs) or #{@params.rerun})
+            returning job_id
             ;
           EndSQL
-          return job_seq
+          return job_id
         }
       end
 
       def do_load
         ManifestFile.create(
           @params.ctl_bucket,
-          job_seq: @job_seq,
+          job_id: @job_id,
           object_urls: @params.object_urls,
           logger: @logger
         ) {|manifest|
@@ -130,7 +130,7 @@ module Bricolage
             set
                 (status, finish_time, message) = ('#{status}', current_timestamp, '#{message}')
             where
-                job_seq = #{@job_seq}
+                job_id = #{@job_id}
             ;
           EndSQL
         }

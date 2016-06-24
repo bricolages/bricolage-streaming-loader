@@ -4,14 +4,14 @@ module Bricolage
 
     class ManifestFile
 
-      def ManifestFile.create(ds, job_seq:, object_urls:, logger:, noop: false, &block)
-        manifest = new(ds, job_seq, object_urls, logger: logger, noop: noop)
+      def ManifestFile.create(ds, job_id:, object_urls:, logger:, noop: false, &block)
+        manifest = new(ds, job_id, object_urls, logger: logger, noop: noop)
         manifest.create_temporary(&block)
       end
 
-      def initialize(ds, job_seq, object_urls, logger:, noop: false)
+      def initialize(ds, job_id, object_urls, logger:, noop: false)
         @ds = ds
-        @job_seq = job_seq
+        @job_id = job_id
         @object_urls = object_urls
         @logger = logger
         @noop = noop
@@ -22,7 +22,7 @@ module Bricolage
       end
 
       def name
-        @name ||= "manifest-#{@job_seq}.json"
+        @name ||= "manifest-#{@job_id}.json"
       end
 
       def url

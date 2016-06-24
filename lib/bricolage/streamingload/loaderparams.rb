@@ -48,8 +48,8 @@ module Bricolage
         @task.id
       end
 
-      def task_seq
-        @task.seq
+      def task_id
+        @task.id
       end
 
       def schema

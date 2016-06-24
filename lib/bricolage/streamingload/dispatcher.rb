@@ -131,8 +131,8 @@ module Bricolage
         @rest_arguments = nil
 
         @opts = opts = OptionParser.new("Usage: #{$0} CONFIG_PATH")
-        opts.on('--task-seq=SEQ', 'Execute oneshot load task (implicitly disables daemon mode).') {|task_seq|
-          @task_seq = task_seq
+        opts.on('--task-id=id', 'Execute oneshot load task (implicitly disables daemon mode).') {|task_id|
+          @task_id = task_id
         }
         opts.on('-e', '--environment=NAME', "Sets execution environment [default: #{Context::DEFAULT_ENV}]") {|env|
           @environment = env

@@ -1,10 +1,10 @@
 CREATE TABLE strload_objects (
-  object_seq bigserial
+  object_id bigserial
   , object_url character varying(512) NOT NULL
   , object_size integer NOT NULL
   , schema_name varchar(128) NOT NULL
   , table_name varchar(128) NOT NULL
   , submit_time timestamp with time zone NOT NULL
-  , CONSTRAINT strload_objects_pkey PRIMARY KEY (object_seq)
+  , CONSTRAINT strload_objects_pkey PRIMARY KEY (object_id)
 );
 CREATE UNIQUE INDEX strload_objects_object_url ON strload_objects (object_url);

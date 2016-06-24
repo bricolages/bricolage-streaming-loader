@@ -35,9 +35,9 @@ module Bricolage
           logger: ctx.logger
         )
 
-        if opts.task_seq
+        if opts.task_id
           # Single task mode
-          service.execute_task opts.task_seq
+          service.execute_task opts.task_id
         else
           # Server mode
           Process.daemon(true) if opts.daemon?
@@ -75,12 +75,12 @@ module Bricolage
         @task_queue.main_handler_loop(handlers: self, message_class: Task)
       end
 
-      def execute_task_by_seq(task_seq)
-        execute_task load_task(task_seq)
+      def execute_task_by_id(task_id)
+        execute_task load_task(task_id)
       end
 
-      def load_task(task_seq, rerun: true)
-        @ctl_ds.open {|conn| LoadTask.load(conn, task_seq, rerun: rerun) }
+      def load_task(task_id, rerun: true)
+        @ctl_ds.open {|conn| LoadTask.load(conn, task_id, rerun: rerun) }
       end
 
       def handle_streaming_load_v3(task)
@@ -88,14 +88,14 @@ module Bricolage
         # 2. Skip disabled (sqs message should not have disabled state since it will never be exectuted)
         # 3. Try execute
         #   - Skip if the task has already been executed AND rerun = false
-        loadtask = load_task(task.seq, rerun: task.rerun)
+        loadtask = load_task(task.id, rerun: task.rerun)
         return if loadtask.disabled # skip if disabled, but don't delete sqs msg
         execute_task(loadtask)
         @task_queue.delete_message(task)
       end
 
       def execute_task(task)
-        @logger.info "handling load task: table=#{task.qualified_name} task_seq=#{task.seq}"
+        @logger.info "handling load task: table=#{task.qualified_name} task_id=#{task.id}"
         loader = Loader.load_from_file(@ctx, @ctl_ds, task, logger: @ctx.logger)
         loader.execute
       end
@@ -106,15 +106,15 @@ module Bricolage
 
       def initialize(argv)
         @argv = argv
-        @task_seq = nil
+        @task_id = nil
         @daemon = false
         @log_file_path = nil
         @pid_file_path = nil
         @rest_arguments = nil
 
         @opts = opts = OptionParser.new("Usage: #{$0} CONFIG_PATH")
-        opts.on('--task-seq=SEQ', 'Execute oneshot load task (implicitly disables daemon mode).') {|task_seq|
-          @task_seq = task_seq
+        opts.on('--task-id=ID', 'Execute oneshot load task (implicitly disables daemon mode).') {|task_id|
+          @task_id = task_id
         }
         opts.on('-e', '--environment=NAME', "Sets execution environment [default: #{Context::DEFAULT_ENV}]") {|env|
           @environment = env
@@ -150,7 +150,7 @@ module Bricolage
       end
 
       attr_reader :rest_arguments, :environment, :log_file_path
-      attr_reader :task_seq
+      attr_reader :task_id
 
       def daemon?
         @daemon

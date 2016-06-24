@@ -28,18 +28,18 @@ module Bricolage
 
     class LoadTask < Task
 
-      def LoadTask.create(task_seq:, rerun: false)
-        super name: 'streaming_load_v3', task_seq: task_seq, rerun: rerun
+      def LoadTask.create(task_id:, rerun: false)
+        super name: 'streaming_load_v3', task_id: task_id, rerun: rerun
       end
 
       def LoadTask.parse_sqs_record(msg, rec)
         {
-          task_seq: rec['taskSeq'],
+          task_id: rec['taskId'],
           rerun: rec['rerun'],
         }
       end
 
-      def LoadTask.load(conn, task_seq, rerun: false)
+      def LoadTask.load(conn, task_id, rerun: false)
         rec = conn.query_row(<<-EndSQL)
           select
               task_class
@@ -51,7 +51,7 @@ module Bricolage
               inner join strload_tables tbl
                   using(schema_name, table_name)
           where
-              task_seq = #{task_seq}
+              task_id = #{task_id}
           ;
         EndSQL
         object_urls = conn.query_values(<<-EndSQL)
@@ -60,11 +60,11 @@ module Bricolage
           from
               strload_task_objects
               inner join strload_objects
-              using (object_seq)
+              using (object_id)
               inner join strload_tasks
-              using (task_seq)
+              using (task_id)
           where
-              task_seq = #{task_seq}
+              task_id = #{task_id}
           ;
         EndSQL
         return nil unless rec
@@ -73,7 +73,7 @@ module Bricolage
           name: rec['task_class'],
           time: nil,
           source: nil,
-          task_seq: task_seq,
+          task_id: task_id,
           schema: rec['schema_name'],
           table: rec['table_name'],
           object_urls: object_urls,
@@ -84,8 +84,8 @@ module Bricolage
 
       alias message_type name
 
-      def init_message(task_seq:, schema: nil, table: nil, object_urls: nil, disabled: false, rerun: false)
-        @seq = task_seq
+      def init_message(task_id:, schema: nil, table: nil, object_urls: nil, disabled: false, rerun: false)
+        @id = task_id
         @rerun = rerun
 
         # Effective only for queue reader process
@@ -95,7 +95,7 @@ module Bricolage
         @disabled = disabled
       end
 
-      attr_reader :seq, :rerun
+      attr_reader :id, :rerun
 
       #
       # For writer only
@@ -109,7 +109,7 @@ module Bricolage
 
       def body
         obj = super
-        obj['taskSeq'] = @seq
+        obj['taskId'] = @id
         obj['schemaName'] = @schema
         obj['tableName'] = @table
         obj['objectUrls'] = @object_urls
