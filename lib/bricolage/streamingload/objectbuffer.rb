@@ -39,7 +39,7 @@ module Bricolage
 
     end
 
-    class ObjectStore
+    class ObjectBuffer
 
       include SQLUtils
 
@@ -48,13 +48,13 @@ module Bricolage
         @logger = logger
       end
 
-      def store(obj)
+      def put(obj)
         @ctl_ds.open {|conn|
           insert_object(conn, obj)
         }
       end
 
-      def assign_objects_to_tasks
+      def flush_tasks
         task_ids  = []
         @ctl_ds.open {|conn|
           conn.transaction {|txn|
