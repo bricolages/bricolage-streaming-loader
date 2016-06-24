@@ -1,6 +1,7 @@
 require 'bricolage/streamingload/loaderparams'
 require 'bricolage/streamingload/manifest'
 require 'bricolage/sqlutils'
+require 'socket'
 require 'json'
 
 module Bricolage
@@ -20,7 +21,7 @@ module Bricolage
         @ctl_ds = ctl_ds
         @params = params
         @logger = logger
-        @process_id = "#{`hostname`.strip}-#{$$}"
+        @process_id = "#{Socket.gethostname}-#{$$}"
       end
 
       def execute
