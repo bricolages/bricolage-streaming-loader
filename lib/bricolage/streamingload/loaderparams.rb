@@ -60,8 +60,8 @@ module Bricolage
         @task.table
       end
 
-      def rerun
-        @task.rerun
+      def force
+        @task.force
       end
 
       def object_urls

@@ -51,7 +51,7 @@ module Bricolage
                 strload_tasks
             where
                 task_id = #{@params.task_id}
-                and (task_id not in (select task_id from strload_jobs) or #{@params.rerun})
+                and (task_id not in (select task_id from strload_jobs) or #{@params.force})
             returning job_id
             ;
           EndSQL

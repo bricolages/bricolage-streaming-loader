@@ -28,18 +28,18 @@ module Bricolage
 
     class LoadTask < Task
 
-      def LoadTask.create(task_id:, rerun: false)
-        super name: 'streaming_load_v3', task_id: task_id, rerun: rerun
+      def LoadTask.create(task_id:, force: false)
+        super name: 'streaming_load_v3', task_id: task_id, force: force
       end
 
       def LoadTask.parse_sqs_record(msg, rec)
         {
           task_id: rec['taskId'],
-          rerun: rec['rerun'],
+          force: rec['force'],
         }
       end
 
-      def LoadTask.load(conn, task_id, rerun: false)
+      def LoadTask.load(conn, task_id, force: false)
         rec = conn.query_row(<<-EndSQL)
           select
               task_class
@@ -78,15 +78,15 @@ module Bricolage
           table: rec['table_name'],
           object_urls: object_urls,
           disabled: rec['disabled'] == 'f' ? false : true,
-          rerun: rerun
+          force: force
         )
       end
 
       alias message_type name
 
-      def init_message(task_id:, schema: nil, table: nil, object_urls: nil, disabled: false, rerun: false)
+      def init_message(task_id:, schema: nil, table: nil, object_urls: nil, disabled: false, force: false)
         @id = task_id
-        @rerun = rerun
+        @force = force
 
         # Effective only for queue reader process
         @schema = schema
@@ -95,7 +95,7 @@ module Bricolage
         @disabled = disabled
       end
 
-      attr_reader :id, :rerun
+      attr_reader :id, :force
 
       #
       # For writer only
@@ -114,7 +114,7 @@ module Bricolage
         obj['tableName'] = @table
         obj['objectUrls'] = @object_urls
         obj['disabled'] = @disabled
-        obj['rerun'] = @rerun
+        obj['force'] = @force
         obj
       end
 

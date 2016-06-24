@@ -79,16 +79,16 @@ module Bricolage
         execute_task load_task(task_id)
       end
 
-      def load_task(task_id, rerun: true)
-        @ctl_ds.open {|conn| LoadTask.load(conn, task_id, rerun: rerun) }
+      def load_task(task_id, force: true)
+        @ctl_ds.open {|conn| LoadTask.load(conn, task_id, force: force) }
       end
 
       def handle_streaming_load_v3(task)
         # 1. Load task detail from table
         # 2. Skip disabled (sqs message should not have disabled state since it will never be exectuted)
         # 3. Try execute
-        #   - Skip if the task has already been executed AND rerun = false
-        loadtask = load_task(task.id, rerun: task.rerun)
+        #   - Skip if the task has already been executed AND force = false
+        loadtask = load_task(task.id, force: task.force)
         return if loadtask.disabled # skip if disabled, but don't delete sqs msg
         execute_task(loadtask)
         @task_queue.delete_message(task)
