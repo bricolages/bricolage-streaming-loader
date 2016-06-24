@@ -1,5 +1,5 @@
 CREATE TABLE strload_task_objects (
-    task_seq bigint
-    , object_seq bigint
-    , CONSTRAINT strload_task_objects_pkey PRIMARY KEY (task_seq, object_seq)
+    task_id bigint
+    , object_id bigint
+    , CONSTRAINT strload_task_objects_pkey PRIMARY KEY (task_id, object_id)
 );

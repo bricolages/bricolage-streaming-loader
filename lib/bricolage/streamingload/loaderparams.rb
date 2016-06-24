@@ -48,8 +48,8 @@ module Bricolage
         @task.id
       end
 
-      def task_seq
-        @task.seq
+      def task_id
+        @task.id
       end
 
       def schema
@@ -60,8 +60,8 @@ module Bricolage
         @task.table
       end
 
-      def rerun
-        @task.rerun
+      def force
+        @task.force
       end
 
       def object_urls
