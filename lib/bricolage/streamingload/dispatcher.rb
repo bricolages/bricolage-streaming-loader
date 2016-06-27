@@ -76,11 +76,13 @@ module Bricolage
         @url_patterns = url_patterns
         @dispatch_interval = dispatch_interval
         @dispatch_message_id = nil
+        @delete_event_buffer = []
         @logger = logger
       end
 
       def event_loop
         @event_queue.main_handler_loop(handlers: self, message_class: Event)
+        delete_events(@delete_event_buffer)
       end
 
       def handle_shutdown(e)
@@ -95,7 +97,7 @@ module Bricolage
         end
         obj = e.loadable_object(@url_patterns)
         @object_buffer.put(obj)
-        @event_queue.delete_message(e)
+        async_delete_event(e)
       end
 
       def handle_dispatch(e)
@@ -110,6 +112,20 @@ module Bricolage
       def set_dispatch_timer
         resp = @event_queue.send_message DispatchEvent.create(delay_seconds: @dispatch_interval)
         @dispatch_message_id = resp.message_id
+      end
+
+      def async_delete_event(e)
+        if @delete_event_buffer.size >= @event_queue.max_number_of_messages
+          res = @event_queue.delete_message_batch(@delete_event_buffer)
+          res.failed.each {|f| @logger.warn "Delete message failed. id: #{f.id}, sender_fault: #{f.sender_fault}, code: #{f.code}, msg: #{f.message}" }
+          @delete_event_buffer.clear
+        else
+          @delete_event_buffer.push e
+        end
+      end
+
+      def log_delete_event_failur(result)
+        result.failed.each {|f| @logger.warn "Delete message failed. id: #{f.id}, sender_fault: #{f.sender_fault}, code: #{f.code}, msg: #{f.message}" }
       end
 
       def delete_events(events)

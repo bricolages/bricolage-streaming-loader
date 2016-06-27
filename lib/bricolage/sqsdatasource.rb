@@ -1,5 +1,6 @@
 require 'bricolage/datasource'
 require 'bricolage/sqswrapper'
+require 'securerandom'
 require 'aws-sdk'
 require 'json'
 require 'time'
@@ -11,13 +12,15 @@ module Bricolage
     declare_type 'sqs'
 
     def initialize(region: 'ap-northeast-1', url:, access_key_id:, secret_access_key:,
-        visibility_timeout:, max_number_of_messages: 10, wait_time_seconds: 20, noop: false)
+        visibility_timeout:, max_number_of_messages: 10, delete_batch_size: 10, wait_time_seconds: 20, noop: false)
       @region = region
       @url = url
       @access_key_id = access_key_id
       @secret_access_key = secret_access_key
       @visibility_timeout = visibility_timeout
       @max_number_of_messages = max_number_of_messages
+      @delete_batch_size = delete_batch_size
+      @delete_message_buffer = []
       @wait_time_seconds = wait_time_seconds
       @noop = noop
     end
@@ -25,6 +28,7 @@ module Bricolage
     attr_reader :region
     attr_reader :access_key_id
     attr_reader :secret_access_key
+    attr_reader :delete_batch_size
 
     def client
       @client ||= begin
@@ -128,6 +132,17 @@ module Bricolage
       )
     end
 
+    def delete_message(msg)
+    end
+
+    def delete_message_barch(msg)
+      if delete_message_buffer.size >= @delete_batch_size
+        client.delete_message_batch(
+          queue_url: @url,
+          entries: msgs.map {|msg| {id: SecureRandom.uuid, receipt_handle: msg.receipt_handle} }
+        )
+    end
+
     def put(msg)
       send_message(msg)
     end
@@ -138,6 +153,18 @@ module Bricolage
         message_body: { 'Records' => [msg.body] }.to_json,
         delay_seconds: msg.delay_seconds
       )
+    end
+
+    class 
+
+      def initalized(
+
+
+      def buffered?
+      end
+
+      def response
+      end
     end
 
   end   # class SQSDataSource
