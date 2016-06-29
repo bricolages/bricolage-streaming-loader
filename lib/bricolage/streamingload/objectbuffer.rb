@@ -74,6 +74,8 @@ module Bricolage
                 , object_size
                 , schema_name
                 , table_name
+                , message_id
+                , event_time
                 , submit_time
                 )
             select
@@ -81,6 +83,8 @@ module Bricolage
                 , #{obj.size}
                 , schema_name
                 , table_name
+                , #{s obj.message_id}
+                , '#{obj.event_time}' AT TIME ZONE 'JST'
                 , current_timestamp
             from
                 strload_tables
