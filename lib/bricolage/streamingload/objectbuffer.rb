@@ -90,7 +90,6 @@ module Bricolage
                 strload_tables
             where
                 data_source_id = #{s obj.data_source_id}
-                and not exists (select * from strload_objects where object_url = #{s obj.url})
             ;
         EndSQL
       end
@@ -111,15 +110,24 @@ module Bricolage
                       schema_name
                       , table_name
                       , count(*) as object_count
-                  from
-                      strload_objects t1
+                  from (
+                      select
+                          min(object_id)
+                          , object_url
+                          , schema_name
+                          , table_name
+                      from
+                          strload_objects
+                      group by
+                          2, 3, 4
+                      ) uniq_objects
                       left outer join strload_task_objects
                           using(object_id)
                   where
                       task_id is null -- not assigned to a task
                   group by
                       schema_name, table_name
-                  ) obj -- number of objects not assigned to a task (won't return zero)
+                  ) obj -- number of objects not assigned to a task per schema_name.table_name (won't return zero)
                   using (schema_name, table_name)
               left outer join (
                   select
@@ -159,8 +167,17 @@ module Bricolage
                   , task.task_id
                   , obj.object_id
                   , load_batch_size
-              from
-                  strload_objects obj
+              from (
+                  select
+                      min(object_id)
+                      , object_url
+                      , schema_name
+                      , table_name
+                  from
+                      strload_objects
+                  group by
+                      2, 3, 4
+                  ) obj
                   inner join (
                       select
                           min(task_id) as task_id -- oldest task
