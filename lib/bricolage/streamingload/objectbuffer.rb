@@ -59,7 +59,7 @@ module Bricolage
         @ctl_ds.open {|conn|
           conn.transaction {|txn|
             task_ids = insert_tasks(conn)
-            insert_task_object_mappings(conn)
+            insert_task_object_mappings(conn) unless task_ids.empty?
           }
         }
         return task_ids.map {|id| LoadTask.create(task_id: id) }
@@ -112,7 +112,7 @@ module Bricolage
                       , count(*) as object_count
                   from (
                       select
-                          min(object_id)
+                          min(object_id) as object_id
                           , object_url
                           , schema_name
                           , table_name
@@ -169,7 +169,7 @@ module Bricolage
                   , load_batch_size
               from (
                   select
-                      min(object_id)
+                      min(object_id) as object_id
                       , object_url
                       , schema_name
                       , table_name
