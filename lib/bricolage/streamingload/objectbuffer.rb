@@ -59,7 +59,7 @@ module Bricolage
         @ctl_ds.open {|conn|
           conn.transaction {|txn|
             task_ids = insert_tasks(conn)
-            insert_task_object_mappings(conn)
+            insert_task_object_mappings(conn) unless task_ids.empty?
           }
         }
         return task_ids.map {|id| LoadTask.create(task_id: id) }
@@ -72,21 +72,22 @@ module Bricolage
             insert into strload_objects
                 (object_url
                 , object_size
-                , schema_name
-                , table_name
+                , data_source_id
+                , message_id
+                , event_time
                 , submit_time
                 )
             select
                 #{s obj.url}
                 , #{obj.size}
-                , schema_name
-                , table_name
+                , #{s obj.data_source_id}
+                , #{s obj.message_id}
+                , '#{obj.event_time}' AT TIME ZONE 'JST'
                 , current_timestamp
             from
                 strload_tables
             where
                 data_source_id = #{s obj.data_source_id}
-                and not exists (select * from strload_objects where object_url = #{s obj.url})
             ;
         EndSQL
       end
@@ -104,19 +105,26 @@ module Bricolage
               strload_tables tbl
               inner join (
                   select
-                      schema_name
-                      , table_name
+                      data_source_id
                       , count(*) as object_count
-                  from
-                      strload_objects t1
+                  from (
+                      select
+                          min(object_id) as object_id
+                          , object_url
+                          , data_source_id
+                      from
+                          strload_objects
+                      group by
+                          2, 3
+                      ) uniq_objects
                       left outer join strload_task_objects
                           using(object_id)
                   where
                       task_id is null -- not assigned to a task
                   group by
-                      schema_name, table_name
-                  ) obj -- number of objects not assigned to a task (won't return zero)
-                  using (schema_name, table_name)
+                      data_source_id
+                  ) obj -- number of objects not assigned to a task per schema_name.table_name (won't return zero)
+                  using (data_source_id)
               left outer join (
                   select
                       schema_name
@@ -155,13 +163,20 @@ module Bricolage
                   , task.task_id
                   , obj.object_id
                   , load_batch_size
-              from
-                  strload_objects obj
+              from (
+                  select
+                      min(object_id) as object_id
+                      , object_url
+                      , data_source_id
+                  from
+                      strload_objects
+                  group by
+                      2, 3
+                  ) obj
                   inner join (
                       select
                           min(task_id) as task_id -- oldest task
-                          , tbl.schema_name
-                          , tbl.table_name
+                          , tbl.data_source_id
                           , max(load_batch_size) as load_batch_size
                       from
                           strload_tasks
@@ -171,9 +186,8 @@ module Bricolage
                           task_id not in (select distinct task_id from strload_task_objects) -- no assigned objects
                       group by
                           2
-                          , 3
                       ) task -- tasks without objects
-                      using(schema_name, table_name)
+                      using(data_source_id)
                   left outer join strload_task_objects task_obj
                       using(object_id)
               where
