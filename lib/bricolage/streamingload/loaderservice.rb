@@ -37,7 +37,7 @@ module Bricolage
 
         if opts.task_id
           # Single task mode
-          service.execute_task opts.task_id
+          service.execute_task_by_id opts.task_id
         else
           # Server mode
           Process.daemon(true) if opts.daemon?
