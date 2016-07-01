@@ -1,6 +1,7 @@
 require 'bricolage/sqsdatasource'
 require 'bricolage/streamingload/task'
 require 'bricolage/streamingload/loader'
+require 'bricolage/logger'
 require 'bricolage/exception'
 require 'bricolage/version'
 require 'optparse'
@@ -19,11 +20,9 @@ module Bricolage
           exit 1
         end
         config_path, * = opts.rest_arguments
-        set_log_path opts.log_file_path if opts.log_file_path
-
         config = YAML.load(File.read(config_path))
-
-        ctx = Context.for_application('.', environment: opts.environment)
+        logger = opts.log_file_path ? new_logger(opts.log_file_path, config) : nil
+        ctx = Context.for_application('.', environment: opts.environment, logger: logger)
         redshift_ds = ctx.get_data_source('sql', config.fetch('redshift-ds'))
         task_queue = ctx.get_data_source('sqs', config.fetch('task-queue-ds'))
 
@@ -46,13 +45,12 @@ module Bricolage
         end
       end
 
-      def LoaderService.set_log_path(path)
-        FileUtils.mkdir_p File.dirname(path)
-        # make readable for retrieve_last_match_from_stderr
-        File.open(path, 'w+') {|f|
-          $stdout.reopen f
-          $stderr.reopen f
-        }
+      def LoaderService.new_logger(path, config)
+          Logger.new(
+            device: path,
+            rotation_period: config.fetch('log-rotation-period', 'daily'),
+            rotation_size: config.fetch('log-rotation-size', nil)
+          )
       end
 
       def LoaderService.create_pid_file(path)
@@ -96,7 +94,7 @@ module Bricolage
 
       def execute_task(task)
         @logger.info "handling load task: table=#{task.qualified_name} task_id=#{task.id}"
-        loader = Loader.load_from_file(@ctx, @ctl_ds, task, logger: @ctx.logger)
+        loader = Loader.load_from_file(@ctx, @ctl_ds, task, logger: @logger)
         loader.execute
       end
 

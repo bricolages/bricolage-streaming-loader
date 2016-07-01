@@ -68,7 +68,6 @@ module Bricolage
           ;
         EndSQL
         return nil unless rec
-        p rec
         new(
           name: rec['task_class'],
           time: nil,

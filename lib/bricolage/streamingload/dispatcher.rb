@@ -1,6 +1,7 @@
 require 'bricolage/exception'
 require 'bricolage/version'
 require 'bricolage/sqsdatasource'
+require 'bricolage/logger'
 require 'bricolage/streamingload/event'
 require 'bricolage/streamingload/objectbuffer'
 require 'bricolage/streamingload/urlpatterns'
@@ -23,10 +24,9 @@ module Bricolage
           exit 1
         end
         config_path, * = opts.rest_arguments
-        set_log_path opts.log_file_path if opts.log_file_path
-
         config = YAML.load(File.read(config_path))
-        ctx = Context.for_application('.', environment: opts.environment)
+        logger = opts.log_file_path ? new_logger(opts.log_file_path, config) : nil
+        ctx = Context.for_application('.', environment: opts.environment, logger: logger)
         event_queue = ctx.get_data_source('sqs', config.fetch('event-queue-ds'))
         task_queue = ctx.get_data_source('sqs', config.fetch('task-queue-ds'))
 
@@ -52,13 +52,12 @@ module Bricolage
         dispatcher.event_loop
       end
 
-      def Dispatcher.set_log_path(path)
-        FileUtils.mkdir_p File.dirname(path)
-        # make readable for retrieve_last_match_from_stderr
-        File.open(path, 'w+') {|f|
-          $stdout.reopen f
-          $stderr.reopen f
-        }
+      def Dispatcher.new_logger(path, config)
+          Logger.new(
+            device: path,
+            rotation_period: config.fetch('log-rotation-period', 'daily'),
+            rotation_size: config.fetch('log-rotation-size', nil)
+          )
       end
 
       def Dispatcher.create_pid_file(path)
