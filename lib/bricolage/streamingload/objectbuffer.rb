@@ -68,6 +68,9 @@ module Bricolage
       private
 
       def insert_object(conn, obj)
+        #HACK - suppress log per object
+        log_level = @logger.level
+        @logger.level = Logger::ERROR
         conn.update(<<-EndSQL)
             insert into strload_objects
                 (object_url
@@ -90,6 +93,7 @@ module Bricolage
                 data_source_id = #{s obj.data_source_id}
             ;
         EndSQL
+        @logger.level = log_level
       end
 
       def insert_tasks(conn)
