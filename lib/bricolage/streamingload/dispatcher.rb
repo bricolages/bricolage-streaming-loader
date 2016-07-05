@@ -53,11 +53,11 @@ module Bricolage
       end
 
       def Dispatcher.new_logger(path, config)
-          Logger.new(
-            device: path,
-            rotation_period: config.fetch('log-rotation-period', 'daily'),
-            rotation_size: config.fetch('log-rotation-size', nil)
-          )
+        Logger.new(
+          device: path,
+          rotation_period: config.fetch('log-rotation-period', 'daily'),
+          rotation_size: config.fetch('log-rotation-size', nil)
+        )
       end
 
       def Dispatcher.create_pid_file(path)
