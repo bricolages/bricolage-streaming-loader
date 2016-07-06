@@ -94,7 +94,7 @@ module Bricolage
         end
         obj = e.loadable_object(@url_patterns)
         @object_buffer.put(obj)
-        @event_queue.delete_message(e)
+        @event_queue.buffered_delete_message(e)
       end
 
       def handle_dispatch(e)

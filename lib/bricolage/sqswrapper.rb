@@ -22,6 +22,11 @@ module Bricolage
       @logger.debug "delete_message(#{args.inspect})"
       @sqs.delete_message(**args)
     end
+
+    def delete_message_batch(**args)
+      @logger.debug "delete_message_batch(#{args.inspect})"
+      @sqs.delete_message_batch(**args)
+    end
   end
 
 

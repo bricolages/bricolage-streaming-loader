@@ -1,5 +1,6 @@
 require 'bricolage/datasource'
 require 'bricolage/sqswrapper'
+require 'securerandom'
 require 'aws-sdk'
 require 'json'
 require 'time'
@@ -11,18 +12,20 @@ module Bricolage
     declare_type 'sqs'
 
     def initialize(region: 'ap-northeast-1', url:, access_key_id:, secret_access_key:,
-        visibility_timeout:, max_number_of_messages: 10, wait_time_seconds: 20, noop: false)
+        visibility_timeout:, max_number_of_messages: 10, max_delete_batch_size: 10, wait_time_seconds: 20, noop: false)
       @region = region
       @url = url
       @access_key_id = access_key_id
       @secret_access_key = secret_access_key
       @visibility_timeout = visibility_timeout
       @max_number_of_messages = max_number_of_messages
+      @max_delete_batch_size = max_delete_batch_size
       @wait_time_seconds = wait_time_seconds
       @noop = noop
     end
 
     attr_reader :region
+    attr_reader :url
     attr_reader :access_key_id
     attr_reader :secret_access_key
 
@@ -50,6 +53,7 @@ module Bricolage
           n_zero = 0
         end
       end
+      @delete_message_buffer.flush if @delete_message_buffer
       logger.info "shutdown gracefully"
     end
 
@@ -128,6 +132,14 @@ module Bricolage
       )
     end
 
+    def buffered_delete_message(msg)
+      delete_message_buffer.put(msg)
+    end
+
+    def delete_message_buffer
+      @delete_message_buffer ||= DeleteMessageBuffer.new(client, @url, @max_delete_batch_size, logger)
+    end
+
     def put(msg)
       send_message(msg)
     end
@@ -140,7 +152,64 @@ module Bricolage
       )
     end
 
-  end   # class SQSDataSource
+    class DeleteMessageBuffer
+
+      def initialize(sqs_client, url, max_buffer_size, logger)
+        @sqs_client = sqs_client
+        @url = url
+        @max_buffer_size = max_buffer_size
+        @logger = logger
+        @buf = {}
+        @retry_counts = Hash.new(0)
+      end
+
+      MAX_RETRY_COUNT = 3
+
+      def put(msg)
+        @buf[SecureRandom.uuid] = msg
+        flush if size >= @max_buffer_size
+      end
+
+      def size
+        @buf.size
+      end
+
+      def flush
+        return unless size > 0
+        response = @sqs_client.delete_message_batch({
+          queue_url: @url,
+          entries: @buf.to_a.map {|item| {id: item[0], receipt_handle: item[1].receipt_handle} }
+        })
+        clear_successes(response.successful)
+        retry_failures(response.failed)
+        @logger.debug "DeleteMessageBatch executed: #{response.successful.size} succeeded, #{response.failed.size} failed."
+      end
+
+      private
+
+      def clear_successes(successes)
+        successes.each do |s|
+          @buf.delete s.id
+        end
+      end
+
+      def retry_failures(failures)
+        return unless failures.size > 0
+        failures.each do |f|
+          @logger.info "DeleteMessageBatch failed to retry for: id=#{f.id}, sender_fault=#{f.sender_fault}, code=#{f.code}, message=#{f.message}"
+        end
+        flush
+        @buf.keys.map {|k| @retry_counts[k] += 1 }
+        @retry_counts.select {|k, v| v >= MAX_RETRY_COUNT }.each do |k, v|
+          @logger.warn "DeleteMessageBatch failed #{MAX_RETRY_COUNT} times for: message_id=#{@buf[k].message_id}, receipt_handle=#{@buf[k].receipt_handle}"
+          @buf.delete k
+          @retry_counts.delete k
+        end
+      end
+
+    end # DeleteMessageBuffer
+
+  end # class SQSDataSource
 
 
   class SQSMessage
