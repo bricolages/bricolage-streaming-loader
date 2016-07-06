@@ -53,7 +53,7 @@ module Bricolage
           n_zero = 0
         end
       end
-      @buffered_message_deleter.flush if @buffered_message_deleter
+      @delete_message_buffer.flush if @delete_message_buffer
       logger.info "shutdown gracefully"
     end
 
@@ -133,8 +133,11 @@ module Bricolage
     end
 
     def buffered_delete_message(msg)
-      @buffered_message_deleter ||= BufferedMessageDeleter.new(client, @url, @max_delete_batch_size, logger)
-      @buffered_message_deleter.delete(msg)
+      delete_message_buffer.put(msg)
+    end
+
+    def delete_message_buffer
+      @delete_message_buffer ||= DeleteMessageBuffer.new(client, @url, @max_delete_batch_size, logger)
     end
 
     def put(msg)
@@ -149,7 +152,7 @@ module Bricolage
       )
     end
 
-    class BufferedMessageDeleter
+    class DeleteMessageBuffer
 
       def initialize(sqs_client, url, max_buffer_size, logger)
         @sqs_client = sqs_client
@@ -162,50 +165,45 @@ module Bricolage
 
       MAX_RETRY_COUNT = 3
 
-      def delete(msg)
-        if current_buffer_size >= @max_buffer_size
-          flush
-          delete msg
-        else
-          @buf[SecureRandom.uuid] = msg
-        end
+      def put(msg)
+        @buf[SecureRandom.uuid] = msg
+        flush if size >= @max_buffer_size
       end
 
-      def current_buffer_size
+      def size
         @buf.size
       end
 
       def flush
-        return unless current_buffer_size > 0
-        response = @sqs_client.delete_message_batch ({
+        return unless size > 0
+        response = @sqs_client.delete_message_batch({
           queue_url: @url,
           entries: @buf.to_a.map {|item| {id: item[0], receipt_handle: item[1].receipt_handle} }
         })
         clear_successes(response.successful)
-        if response.failed.size > 0
-          response.failed.each do |f|
-            @logger.info "DeleteMessageBatch failed to retry for: id=#{f.id}, sender_fault=#{f.sender_fault}, code=#{f.code}, message=#{f.message}"
-          end
-          retry_flush
-        end
+        retry_failures(response.failed)
         @logger.debug "DeleteMessageBatch executed: #{response.successful.size} succeeded, #{response.failed.size} failed."
       end
 
       private
 
-      def retry_flush
+      def clear_successes(successes)
+        successes.each do |s|
+          @buf.delete s.id
+        end
+      end
+
+      def retry_failures(failures)
+        return unless failures.size > 0
+        failures.each do |f|
+          @logger.info "DeleteMessageBatch failed to retry for: id=#{f.id}, sender_fault=#{f.sender_fault}, code=#{f.code}, message=#{f.message}"
+        end
         flush
         @buf.keys.map {|k| @retry_counts[k] += 1 }
         @retry_counts.select {|k, v| v >= MAX_RETRY_COUNT }.each do |k, v|
           @logger.warn "DeleteMessageBatch failed #{MAX_RETRY_COUNT} times for: message_id=#{@buf[k].message_id}, receipt_handle=#{@buf[k].receipt_handle}"
           @buf.delete k
           @retry_counts.delete k
-        end
-      end
-
-      def clear_successes(successes)
-        successes.each do |s|
-          @buf.delete s.id
         end
       end
 
