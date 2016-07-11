@@ -5,5 +5,5 @@ CREATE TABLE strload_tables (
   , load_batch_size integer NOT NULL
   , load_interval integer NOT NULL
   , disabled boolean DEFAULT false NOT NULL
-  , CONSTRAINT strlaod_tables_pkey PRIMARY KEY (schema_name, table_name)
+  , CONSTRAINT strload_tables_pkey PRIMARY KEY (schema_name, table_name)
 );
