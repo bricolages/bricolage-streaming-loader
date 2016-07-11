@@ -44,7 +44,7 @@ module Bricolage
                 )
             select
                 task_id
-                , '#{@process_id}'
+                , #{s @process_id}
                 , 'running'
                 , current_timestamp
             from
@@ -95,8 +95,8 @@ module Bricolage
       def load_objects(dest_table, manifest, options)
         @connection.execute(<<-EndSQL.strip.gsub(/\s+/, ' '))
             copy #{dest_table}
-            from '#{manifest.url}'
-            credentials '#{manifest.credential_string}'
+            from #{s manifest.url}
+            credentials #{s manifest.credential_string}
             manifest
             statupdate false
             compupdate false
@@ -120,11 +120,7 @@ module Bricolage
 
       def write_job_error(status, message)
         @end_time = Time.now
-        write_job_result status, escape(message).lines.first.strip[0, MAX_MESSAGE_LENGTH]
-      end
-
-      def escape(text)
-        text.gsub("'"){"''"}
+        write_job_result status, message.lines.first.strip[0, MAX_MESSAGE_LENGTH]
       end
 
       def write_job_result(status, message)
@@ -133,7 +129,7 @@ module Bricolage
             update
                 strload_jobs
             set
-                (status, finish_time, message) = ('#{status}', current_timestamp, '#{message}')
+                (status, finish_time, message) = (#{s status}, current_timestamp, #{s message})
             where
                 job_id = #{@job_id}
             ;
