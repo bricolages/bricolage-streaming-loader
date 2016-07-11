@@ -120,7 +120,8 @@ module Bricolage
 
       def write_job_error(status, message)
         @end_time = Time.now
-        write_job_result status, message.lines.first.strip[0, MAX_MESSAGE_LENGTH]
+        escaped_message = message.gsub("'"){"''"}
+        write_job_result status, escaped_message.lines.first.strip[0, MAX_MESSAGE_LENGTH]
       end
 
       def write_job_result(status, message)
