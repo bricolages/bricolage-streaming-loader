@@ -115,12 +115,13 @@ module Bricolage
                       select
                           min(object_id) as object_id
                           , object_url
-                          , data_source_id
                       from
                           strload_objects
                       group by
-                          2, 3
+                          object_url
                       ) uniq_objects
+                      inner join strload_objects
+                          using(object_id)
                       left outer join strload_task_objects
                           using(object_id)
                   where
