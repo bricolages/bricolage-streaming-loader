@@ -89,6 +89,7 @@ module Bricolage
         loadtask = load_task(task.id, force: task.force)
         return if loadtask.disabled # skip if disabled, but don't delete sqs msg
         execute_task(loadtask)
+        # Delete load task immediately (do not use async delete)
         @task_queue.delete_message(task)
       end
 
