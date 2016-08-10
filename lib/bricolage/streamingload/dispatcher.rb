@@ -16,7 +16,7 @@ module Bricolage
 
   module StreamingLoad
 
-    class Dispatcher
+    class Dispatcher < SQSDataSource::MessageHandler
 
       def Dispatcher.main
         opts = DispatcherOptions.new(ARGV)
@@ -89,14 +89,14 @@ module Bricolage
 
       def event_loop
         set_dispatch_timer
-        @event_queue.main_handler_loop(handlers: self, message_class: Event)
-        @event_queue.delete_message_buffer.flush_force
+        @event_queue.handle_messages(handler: self, message_class: Event)
+        @event_queue.process_async_delete_force
         logger.info "shutdown gracefully"
       end
 
+      # override
       def after_message_batch
-        # Process delayed (async) delete requests after each message batch.
-        @event_queue.delete_message_buffer.flush
+        @event_queue.process_async_delete
         if @checkpoint_requested
           create_checkpoint
         end

@@ -95,17 +95,17 @@ module Bricolage
 
       # first flush
       flush_time = Time.now
-      ds.delete_message_buffer.flush(flush_time)
-      assert_equal 1, ds.delete_message_buffer.size
-      bufent = ds.delete_message_buffer.instance_variable_get(:@buf).values.first
+      ds.process_async_delete(flush_time)
+      delete_buf = ds.__send__(:delete_message_buffer)
+      bufent = delete_buf.instance_variable_get(:@buf).values.first
       assert_equal 'receipt_handle_1', bufent.message.receipt_handle
       assert_equal 1, bufent.n_failure
       assert_false bufent.issuable?(flush_time)
       assert_true bufent.issuable?(flush_time + 180)
 
       # second flush
-      ds.delete_message_buffer.flush(flush_time + 180)
-      assert_true ds.delete_message_buffer.empty?
+      ds.process_async_delete(flush_time + 180)
+      assert_true delete_buf.empty?
     end
 
   end

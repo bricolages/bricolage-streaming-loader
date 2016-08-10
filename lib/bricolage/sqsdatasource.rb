@@ -39,19 +39,17 @@ module Bricolage
     # High-Level Polling Interface
     #
 
-    def main_handler_loop(handlers:, message_class:)
+    def handle_messages(handler:, message_class:)
       trap_signals
-
-      n_zero = 0
-      until terminating?
-        insert_handler_wait(n_zero)
-        n_msg = handle_messages(handlers: handlers, message_class: message_class)
-        if n_msg == 0
-          n_zero += 1
-        else
-          n_zero = 0
+      polling_loop do
+        result = poll or next true
+        msgs = message_class.for_sqs_result(result)
+        msgs.each do |msg|
+          handler.handle(msg)
         end
-        handlers.after_message_batch
+        handler.after_message_batch
+        break if terminating?
+        msgs.empty?
       end
     end
 
@@ -64,6 +62,7 @@ module Bricolage
         initiate_terminate
       }
     end
+    private :trap_signals
 
     def initiate_terminate
       # No I/O allowed in this method
@@ -74,36 +73,72 @@ module Bricolage
       @terminating
     end
 
-    def insert_handler_wait(n_zero)
-      sec = 2 ** [n_zero, 6].min   # max 64s
-      logger.info "queue wait: sleep #{sec}" if n_zero > 0
+    def polling_loop
+      n_failure = 0
+      while true
+        failed = yield
+        if failed
+          n_failure += 1
+        else
+          n_failure = 0
+        end
+        insert_handler_wait(n_failure)
+      end
+    end
+    private :polling_loop
+
+    def insert_handler_wait(n_failure)
+      sec = 2 ** [n_failure, 6].min   # max 64s
+      logger.info "queue wait: sleep #{sec}" if n_failure > 0
       sleep sec
     end
+    private :insert_handler_wait
 
-    def handle_messages(handlers:, message_class:)
-      n_msg = foreach_message(message_class) do |msg|
-        logger.debug "handling message: #{msg.inspect}" if logger.debug?
-        mid = "handle_#{msg.message_type}"
-        # just ignore unknown event to make app migration easy
-        if handlers.respond_to?(mid, true)
-          handlers.__send__(mid, msg)
-        else
-          logger.error "unknown SQS message type: #{msg.message_type.inspect} (message-id: #{msg.message_id})"
-        end
-      end
-      n_msg
-    end
-
-    def foreach_message(message_class, &block)
+    def poll
       result = receive_messages()
       unless result and result.successful?
         logger.error "ReceiveMessage failed: #{result ? result.error.message : '(result=nil)'}"
         return nil
       end
-      logger.info "receive #{result.messages.size} messages" unless result.messages.empty?
-      msgs = message_class.for_sqs_result(result)
-      msgs.each(&block)
-      msgs.size
+      logger.info "receive #{result.messages.size} messages"
+      result
+    end
+
+    class MessageHandler
+      # abstract logger()
+
+      def handle(msg)
+        logger.debug "handling message: #{msg.inspect}" if logger.debug?
+        if handleable?(msg)
+          call_handler_method(msg)
+        else
+          handle_unknown(msg)
+        end
+      end
+
+      def handleable?(msg)
+        respond_to?(handler_method(msg), true)
+      end
+
+      def call_handler_method(msg)
+        __send__(handler_method(msg), msg)
+      end
+
+      def handler_method(msg)
+        "handle_#{msg.message_type}".intern
+      end
+
+      # Unknown message handler.
+      # Feel free to override this method.
+      def handle_unknown(msg)
+        # just ignore unknown message to make app migration easy
+        logger.error "unknown message type: #{msg.message_type.inspect} (message-id: #{msg.message_id})"
+      end
+
+      # Called after each message batch (ReceiveMessage) is processed.
+      # Override this method in subclasses on demand.
+      def after_message_batch
+      end
     end
 
     #
@@ -120,6 +155,18 @@ module Bricolage
       result
     end
 
+    def put(msg)
+      send_message(msg)
+    end
+
+    def send_message(msg)
+      client.send_message(
+        queue_url: @url,
+        message_body: { 'Records' => [msg.body] }.to_json,
+        delay_seconds: msg.delay_seconds
+      )
+    end
+
     def delete_message(msg)
       client.delete_message(
         queue_url: @url,
@@ -131,20 +178,18 @@ module Bricolage
       delete_message_buffer.put(msg)
     end
 
+    def process_async_delete(now = Time.now)
+      delete_message_buffer.flush(now)
+    end
+
+    def process_async_delete_force
+      delete_message_buffer.flush_force
+    end
+
+    private
+
     def delete_message_buffer
       @delete_message_buffer ||= DeleteMessageBuffer.new(client, @url, logger)
-    end
-
-    def put(msg)
-      send_message(msg)
-    end
-
-    def send_message(msg)
-      client.send_message(
-        queue_url: @url,
-        message_body: { 'Records' => [msg.body] }.to_json,
-        delay_seconds: msg.delay_seconds
-      )
     end
 
     class DeleteMessageBuffer
