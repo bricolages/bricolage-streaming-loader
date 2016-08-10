@@ -84,17 +84,18 @@ module Bricolage
 
       def handle_shutdown(e)
         @event_queue.initiate_terminate
+        # Delete this event immediately
         @event_queue.delete_message(e)
       end
 
       def handle_data(e)
         unless e.created?
-          @event_queue.delete_message(e)
+          @event_queue.delete_message_async(e)
           return
         end
         obj = e.loadable_object(@url_patterns)
         @object_buffer.put(obj)
-        @event_queue.buffered_delete_message(e)
+        @event_queue.delete_message_async(e)
       end
 
       def handle_dispatch(e)
@@ -103,18 +104,13 @@ module Bricolage
           tasks.each {|task| @task_queue.put task }
           set_dispatch_timer
         end
+        # Delete this event immediately
         @event_queue.delete_message(e)
       end
 
       def set_dispatch_timer
-        resp = @event_queue.send_message DispatchEvent.create(delay_seconds: @dispatch_interval)
-        @dispatch_message_id = resp.message_id
-      end
-
-      def delete_events(events)
-        events.each do |e|
-          @event_queue.delete_message(e)
-        end
+        res = @event_queue.send_message(DispatchEvent.create(delay_seconds: @dispatch_interval))
+        @dispatch_message_id = res.message_id
       end
 
     end

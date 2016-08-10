@@ -12,14 +12,13 @@ module Bricolage
     declare_type 'sqs'
 
     def initialize(region: 'ap-northeast-1', url:, access_key_id:, secret_access_key:,
-        visibility_timeout:, max_number_of_messages: 10, max_delete_batch_size: 10, wait_time_seconds: 20, noop: false)
+        visibility_timeout:, max_number_of_messages: 10, wait_time_seconds: 20, noop: false)
       @region = region
       @url = url
       @access_key_id = access_key_id
       @secret_access_key = secret_access_key
       @visibility_timeout = visibility_timeout
       @max_number_of_messages = max_number_of_messages
-      @max_delete_batch_size = max_delete_batch_size
       @wait_time_seconds = wait_time_seconds
       @noop = noop
     end
@@ -40,20 +39,21 @@ module Bricolage
     # High-Level Polling Interface
     #
 
-    def main_handler_loop(handlers)
+    def main_handler_loop(handlers:, message_class:)
       trap_signals
 
       n_zero = 0
       until terminating?
         insert_handler_wait(n_zero)
-        n_msg = handle_messages(handlers)
+        n_msg = handle_messages(handlers: handlers, message_class: message_class)
         if n_msg == 0
           n_zero += 1
         else
           n_zero = 0
         end
+        delete_message_buffer.flush
       end
-      @delete_message_buffer.flush if @delete_message_buffer
+      delete_message_buffer.flush_force
       logger.info "shutdown gracefully"
     end
 
@@ -115,8 +115,6 @@ module Bricolage
     def receive_messages
       result = client.receive_message(
         queue_url: @url,
-        attribute_names: ["All"],
-        message_attribute_names: ["All"],
         max_number_of_messages: @max_number_of_messages,
         visibility_timeout: @visibility_timeout,
         wait_time_seconds: @wait_time_seconds
@@ -125,19 +123,18 @@ module Bricolage
     end
 
     def delete_message(msg)
-      # TODO: use batch request?
       client.delete_message(
         queue_url: @url,
         receipt_handle: msg.receipt_handle
       )
     end
 
-    def buffered_delete_message(msg)
+    def delete_message_async(msg)
       delete_message_buffer.put(msg)
     end
 
     def delete_message_buffer
-      @delete_message_buffer ||= DeleteMessageBuffer.new(client, @url, @max_delete_batch_size, logger)
+      @delete_message_buffer ||= DeleteMessageBuffer.new(client, @url, logger)
     end
 
     def put(msg)
@@ -154,60 +151,107 @@ module Bricolage
 
     class DeleteMessageBuffer
 
-      def initialize(sqs_client, url, max_buffer_size, logger)
-        @sqs_client = sqs_client
-        @url = url
-        @max_buffer_size = max_buffer_size
-        @logger = logger
-        @buf = {}
-        @retry_counts = Hash.new(0)
-      end
-
+      BATCH_SIZE_MAX = 10   # SQS system limit
       MAX_RETRY_COUNT = 3
 
+      def initialize(sqs_client, url, logger)
+        @sqs_client = sqs_client
+        @url = url
+        @logger = logger
+        @buf = {}
+      end
+
       def put(msg)
-        @buf[SecureRandom.uuid] = msg
-        flush if size >= @max_buffer_size
+        ent = Entry.new(msg)
+        @buf[ent.id] = ent
+        flush if full?
+      end
+
+      def empty?
+        @buf.empty?
+      end
+
+      def full?
+        @buf.size >= BATCH_SIZE_MAX
       end
 
       def size
         @buf.size
       end
 
-      def flush
-        return unless size > 0
-        response = @sqs_client.delete_message_batch({
-          queue_url: @url,
-          entries: @buf.to_a.map {|item| {id: item[0], receipt_handle: item[1].receipt_handle} }
-        })
-        clear_successes(response.successful)
-        retry_failures(response.failed)
-        @logger.debug "DeleteMessageBatch executed: #{response.successful.size} succeeded, #{response.failed.size} failed."
+      # Flushes all delayed delete requests, including pending requests
+      def flush_force
+        # retry continues in only 2m, now+1h must be after than all @next_issue_time
+        flush(Time.now + 3600)
       end
 
-      private
-
-      def clear_successes(successes)
-        successes.each do |s|
-          @buf.delete s.id
+      def flush(now = Time.now)
+        entries = @buf.values.select {|ent| ent.issuable?(now) }
+        return if entries.empty?
+        @logger.info "flushing async delete requests"
+        entries.each_slice(BATCH_SIZE_MAX) do |ents|
+          res = @sqs_client.delete_message_batch(queue_url: @url, entries: ents.map(&:request_params))
+          @logger.info "DeleteMessageBatch executed: #{res.successful.size} succeeded, #{res.failed.size} failed"
+          issued_time = Time.now
+          res.successful.each do |s|
+            @buf.delete s.id
+          end
+          res.failed.each do |f|
+            ent = @buf[f.id]
+            unless ent
+              @logger.error "[BUG] no corrensponding DeleteMessageBuffer entry: id=#{f.id}"
+              next
+            end
+            ent.failed!(issued_time)
+            if ent.too_many_failure?
+              @logger.warn "DeleteMessage failure count exceeded the limit; give up: message_id=#{ent.message.message_id}, receipt_handle=#{ent.message.receipt_handle}"
+              @buf.delete f.id
+              next
+            end
+            @logger.info "DeleteMessageBatch partially failed (#{ent.n_failure} times): sender_fault=#{f.sender_fault}, code=#{f.code}, message=#{f.message}"
+          end
         end
       end
 
-      def retry_failures(failures)
-        return unless failures.size > 0
-        failures.each do |f|
-          @logger.info "DeleteMessageBatch failed to retry for: id=#{f.id}, sender_fault=#{f.sender_fault}, code=#{f.code}, message=#{f.message}"
+      class Entry
+        def initialize(msg)
+          @message = msg
+          @id = SecureRandom.uuid
+          @n_failure = 0
+          @last_issued_time = nil
+          @next_issue_time = nil
         end
-        flush
-        @buf.keys.map {|k| @retry_counts[k] += 1 }
-        @retry_counts.select {|k, v| v >= MAX_RETRY_COUNT }.each do |k, v|
-          @logger.warn "DeleteMessageBatch failed #{MAX_RETRY_COUNT} times for: message_id=#{@buf[k].message_id}, receipt_handle=#{@buf[k].receipt_handle}"
-          @buf.delete k
-          @retry_counts.delete k
+
+        attr_reader :id
+        attr_reader :message
+        attr_reader :n_failure
+
+        def issuable?(now)
+          @n_failure == 0 or now > @next_issue_time
+        end
+
+        def failed!(issued_time = Time.now)
+          @n_failure += 1
+          @last_issued_time = issued_time
+          @next_issue_time = @last_issued_time + next_retry_interval
+        end
+
+        def next_retry_interval
+          # 16s, 32s, 64s -> total 2m
+          2 ** (3 + @n_failure)
+        end
+
+        def too_many_failure?
+          # (first request) + (3 retry requests) = (4 requests)
+          @n_failure > MAX_RETRY_COUNT
+        end
+
+        def request_params
+          { id: @id, receipt_handle: @message.receipt_handle }
         end
       end
 
-    end # DeleteMessageBuffer
+    end # class DeleteMessageBuffer
 
   end # class SQSDataSource
 

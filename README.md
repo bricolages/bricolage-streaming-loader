@@ -11,7 +11,7 @@ See LICENSES file for details.
 
 ## Running Test
 
-% rake test
+% bundle exec rake test
 
 ## Author
 
