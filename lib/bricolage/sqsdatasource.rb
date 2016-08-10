@@ -186,7 +186,7 @@ module Bricolage
       end
 
       def flush(now = Time.now)
-        entries = @buf.values.select {|ent| ent.issurable?(now) }
+        entries = @buf.values.select {|ent| ent.issuable?(now) }
         return if entries.empty?
         @logger.info "flushing async delete requests"
         entries.each_slice(BATCH_SIZE_MAX) do |ents|
@@ -226,7 +226,7 @@ module Bricolage
         attr_reader :message
         attr_reader :n_failure
 
-        def issurable?(now)
+        def issuable?(now)
           @n_failure == 0 or now > @next_issue_time
         end
 

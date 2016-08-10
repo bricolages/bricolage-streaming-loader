@@ -100,8 +100,8 @@ module Bricolage
       bufent = ds.delete_message_buffer.instance_variable_get(:@buf).values.first
       assert_equal 'receipt_handle_1', bufent.message.receipt_handle
       assert_equal 1, bufent.n_failure
-      assert_false bufent.issurable?(flush_time)
-      assert_true bufent.issurable?(flush_time + 180)
+      assert_false bufent.issuable?(flush_time)
+      assert_true bufent.issuable?(flush_time + 180)
 
       # second flush
       ds.delete_message_buffer.flush(flush_time + 180)
