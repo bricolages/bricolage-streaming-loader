@@ -95,6 +95,7 @@ module Bricolage
 
     end
 
+
     class DispatchEvent < Event
 
       def DispatchEvent.create(delay_seconds:)
@@ -105,6 +106,7 @@ module Bricolage
 
       def init_message(dummy: nil)
       end
+
     end
 
 
