@@ -51,10 +51,8 @@ module Bricolage
         else
           n_zero = 0
         end
-        delete_message_buffer.flush
+        handlers.after_message_batch
       end
-      delete_message_buffer.flush_force
-      logger.info "shutdown gracefully"
     end
 
     def trap_signals

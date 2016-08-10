@@ -11,6 +11,7 @@ module Bricolage
         when rec['eventName'] == 'shutdown' then ShutdownEvent
         when rec['eventName'] == 'dispatch' then DispatchEvent
         when rec['eventName'] == 'flush' then FlushEvent
+        when rec['eventName'] == 'checkpoint' then CheckPointEvent
         when rec['eventSource'] == 'aws:s3'
           S3ObjectEvent
         else
@@ -41,7 +42,26 @@ module Bricolage
 
       alias message_type name
 
-      def init_message
+      def init_message(dummy: nil)
+      end
+
+    end
+
+
+    # Flushes all tables and shutdown
+    class CheckPointEvent < Event
+
+      def CheckPointEvent.create
+        super name: 'checkpoint'
+      end
+
+      def CheckPointEvent.parse_sqs_record(msg, rec)
+        {}
+      end
+
+      alias message_type name
+
+      def init_message(dummy: nil)
       end
 
     end
@@ -83,7 +103,7 @@ module Bricolage
 
       alias message_type name
 
-      def init_message(dummy)
+      def init_message(dummy: nil)
       end
     end
 

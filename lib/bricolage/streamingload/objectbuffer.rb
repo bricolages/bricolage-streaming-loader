@@ -55,11 +55,29 @@ module Bricolage
       end
 
       def flush_tasks
-        task_ids  = []
+        task_ids = nil
         @ctl_ds.open {|conn|
           conn.transaction {|txn|
             task_ids = insert_tasks(conn)
             insert_task_object_mappings(conn) unless task_ids.empty?
+          }
+        }
+        return task_ids.map {|id| LoadTask.create(task_id: id) }
+      end
+
+      # Flushes all objects of all tables immediately with no
+      # additional conditions, to create "stream checkpoint".
+      def flush_tasks_force
+        task_ids  = []
+        @ctl_ds.open {|conn|
+          conn.transaction {|txn|
+            # insert_task_object_mappings may not consume all saved objects
+            # (e.g. there are too many objects for one table), we must create
+            # tasks repeatedly until there are no unassigned objects.
+            until (ids = insert_tasks_force(conn)).empty?
+              insert_task_object_mappings(conn)
+              task_ids.concat ids
+            end
           }
         }
         return task_ids.map {|id| LoadTask.create(task_id: id) }
@@ -96,7 +114,11 @@ module Bricolage
         @logger.level = log_level
       end
 
-      def insert_tasks(conn)
+      def insert_tasks_force(conn)
+        insert_tasks(conn, force: true)
+      end
+
+      def insert_tasks(conn, force: false)
         vals = conn.query_values(<<-EndSQL)
           insert into
               strload_tasks (task_class, schema_name, table_name, submit_time)
@@ -144,6 +166,7 @@ module Bricolage
           where
               not tbl.disabled -- not disabled
               and (
+                #{force ? "true or" : ""} -- Creates tasks with no conditions if forced
                 obj.object_count > tbl.load_batch_size -- batch_size exceeded?
                 or extract(epoch from current_timestamp - latest_submit_time) > load_interval -- load_interval exceeded?
                 or latest_submit_time is null -- no last task

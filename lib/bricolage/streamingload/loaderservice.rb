@@ -77,6 +77,11 @@ module Bricolage
 
       def event_loop
         @task_queue.main_handler_loop(handlers: self, message_class: Task)
+        logger.info "shutdown gracefully"
+      end
+
+      def after_message_batch
+        # does nothing
       end
 
       def execute_task_by_id(task_id)
