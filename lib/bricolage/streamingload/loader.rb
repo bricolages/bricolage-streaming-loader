@@ -120,6 +120,7 @@ module Bricolage
 
       def write_job_error(status, message)
         @end_time = Time.now
+        @logger.warn message.lines.first
         write_job_result status, message.lines.first.strip[0, MAX_MESSAGE_LENGTH]
       end
 

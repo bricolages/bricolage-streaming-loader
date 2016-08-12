@@ -49,6 +49,9 @@ module Bricolage
           create_pid_file opts.pid_file_path if opts.pid_file_path
           service.event_loop
         end
+      rescue Exception => e
+        alert_logger.error e.message
+        raise
       end
 
       def LoaderService.new_logger(path, config)
