@@ -5,6 +5,7 @@ require 'bricolage/logger'
 require 'bricolage/streamingload/event'
 require 'bricolage/streamingload/objectbuffer'
 require 'bricolage/streamingload/urlpatterns'
+require 'bricolage/streamingload/alertinglogger'
 require 'aws-sdk'
 require 'yaml'
 require 'optparse'
@@ -29,10 +30,15 @@ module Bricolage
         ctx = Context.for_application('.', environment: opts.environment, logger: logger)
         event_queue = ctx.get_data_source('sqs', config.fetch('event-queue-ds'))
         task_queue = ctx.get_data_source('sqs', config.fetch('task-queue-ds'))
+        alert_logger = AlertingLogger.new(
+          logger: ctx.logger,
+          sns_datasource: ctx.get_data_source('sns', config.fetch('sns-ds')),
+          alert_level: config.fetch('alert-level', 'warn')
+        )
 
         object_buffer = ObjectBuffer.new(
           control_data_source: ctx.get_data_source('sql', config.fetch('ctl-postgres-ds')),
-          logger: ctx.logger
+          logger: alert_logger
         )
 
         url_patterns = URLPatterns.for_config(config.fetch('url_patterns'))
@@ -43,7 +49,7 @@ module Bricolage
           object_buffer: object_buffer,
           url_patterns: url_patterns,
           dispatch_interval: 60,
-          logger: ctx.logger
+          logger: alert_logger
         )
 
         Process.daemon(true) if opts.daemon?

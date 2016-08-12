@@ -1,6 +1,7 @@
 require 'bricolage/sqsdatasource'
 require 'bricolage/streamingload/task'
 require 'bricolage/streamingload/loader'
+require 'bricolage/streamingload/alertinglogger'
 require 'bricolage/logger'
 require 'bricolage/exception'
 require 'bricolage/version'
@@ -25,13 +26,18 @@ module Bricolage
         ctx = Context.for_application('.', environment: opts.environment, logger: logger)
         redshift_ds = ctx.get_data_source('sql', config.fetch('redshift-ds'))
         task_queue = ctx.get_data_source('sqs', config.fetch('task-queue-ds'))
+        alert_logger = AlertingLogger.new(
+          logger: ctx.logger,
+          sns_datasource: ctx.get_data_source('sns', config.fetch('sns-ds')),
+          alert_level: config.fetch('alert-level', 'warn')
+        )
 
         service = new(
           context: ctx,
           control_data_source: ctx.get_data_source('sql', config.fetch('ctl-postgres-ds')),
           data_source: redshift_ds,
           task_queue: task_queue,
-          logger: ctx.logger
+          logger: alert_logger
         )
 
         if opts.task_id
