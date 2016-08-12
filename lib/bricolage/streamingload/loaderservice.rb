@@ -11,7 +11,7 @@ module Bricolage
 
   module StreamingLoad
 
-    class LoaderService
+    class LoaderService < SQSDataSource::MessageHandler
 
       def LoaderService.main
         opts = LoaderServiceOptions.new(ARGV)
@@ -76,7 +76,8 @@ module Bricolage
       end
 
       def event_loop
-        @task_queue.main_handler_loop(handlers: self, message_class: Task)
+        @task_queue.handle_messages(handler: self, message_class: Task)
+        @logger.info "shutdown gracefully"
       end
 
       def execute_task_by_id(task_id)
@@ -87,6 +88,7 @@ module Bricolage
         @ctl_ds.open {|conn| LoadTask.load(conn, task_id, force: force) }
       end
 
+      # message handler
       def handle_streaming_load_v3(task)
         # 1. Load task detail from table
         # 2. Skip disabled (sqs message should not have disabled state since it will never be exectuted)

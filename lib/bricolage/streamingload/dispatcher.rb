@@ -1,3 +1,4 @@
+require 'bricolage/context'
 require 'bricolage/exception'
 require 'bricolage/version'
 require 'bricolage/sqsdatasource'
@@ -15,7 +16,7 @@ module Bricolage
 
   module StreamingLoad
 
-    class Dispatcher
+    class Dispatcher < SQSDataSource::MessageHandler
 
       def Dispatcher.main
         opts = DispatcherOptions.new(ARGV)
@@ -54,7 +55,6 @@ module Bricolage
 
         Process.daemon(true) if opts.daemon?
         create_pid_file opts.pid_file_path if opts.pid_file_path
-        dispatcher.set_dispatch_timer
         dispatcher.event_loop
       end
 
@@ -82,16 +82,53 @@ module Bricolage
         @dispatch_interval = dispatch_interval
         @dispatch_message_id = nil
         @logger = logger
+        @checkpoint_requested = false
       end
 
+      attr_reader :logger
+
       def event_loop
-        @event_queue.main_handler_loop(handlers: self, message_class: Event)
+        set_dispatch_timer
+        @event_queue.handle_messages(handler: self, message_class: Event)
+        @event_queue.process_async_delete_force
+        logger.info "shutdown gracefully"
+      end
+
+      # override
+      def after_message_batch
+        @event_queue.process_async_delete
+        if @checkpoint_requested
+          create_checkpoint
+        end
       end
 
       def handle_shutdown(e)
         @event_queue.initiate_terminate
         # Delete this event immediately
         @event_queue.delete_message(e)
+      end
+
+      def handle_checkpoint(e)
+        # Delay creating CHECKPOINT after the current message batch,
+        # because any other extra events are already received.
+        @checkpoint_requested = true
+        # Delete this event immediately
+        @event_queue.delete_message(e)
+      end
+
+      def create_checkpoint
+        logger.info "*** Creating checkpoint requested ***"
+        logger.info "Force-flushing all objects..."
+        flush_all_tasks_immediately
+        logger.info "All objects flushed; shutting down..."
+        @event_queue.initiate_terminate
+      end
+
+      def flush_all_tasks_immediately
+        tasks = @object_buffer.flush_tasks_force
+        tasks.each do |task|
+          @task_queue.put task
+        end
       end
 
       def handle_data(e)
