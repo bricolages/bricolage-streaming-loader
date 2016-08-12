@@ -1,5 +1,4 @@
 require 'bricolage/datasource'
-require 'bricolage/sqswrapper'
 require 'securerandom'
 require 'aws-sdk'
 require 'json'
@@ -27,6 +26,10 @@ module Bricolage
     attr_reader :url
     attr_reader :access_key_id
     attr_reader :secret_access_key
+
+    attr_reader :visibility_timeout
+    attr_reader :max_number_of_messages
+    attr_reader :wait_time_seconds
 
     def client
       @client ||= begin
@@ -297,6 +300,36 @@ module Bricolage
     end # class DeleteMessageBuffer
 
   end # class SQSDataSource
+
+
+  class SQSClientWrapper
+
+    def initialize(sqs, logger:)
+      @sqs = sqs
+      @logger = logger
+    end
+
+    def receive_message(**args)
+      @logger.debug "receive_message(#{args.inspect})"
+      @sqs.receive_message(**args)
+    end
+
+    def send_message(**args)
+      @logger.debug "send_message(#{args.inspect})"
+      @sqs.send_message(**args)
+    end
+
+    def delete_message(**args)
+      @logger.debug "delete_message(#{args.inspect})"
+      @sqs.delete_message(**args)
+    end
+
+    def delete_message_batch(**args)
+      @logger.debug "delete_message_batch(#{args.inspect})"
+      @sqs.delete_message_batch(**args)
+    end
+
+  end   # class SQSClientWrapper
 
 
   class SQSMessage
