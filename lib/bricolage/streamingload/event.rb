@@ -10,7 +10,7 @@ module Bricolage
         case
         when rec['eventName'] == 'shutdown' then ShutdownEvent
         when rec['eventName'] == 'dispatch' then DispatchEvent
-        when rec['eventName'] == 'flush' then FlushEvent
+        when rec['eventName'] == 'flushtable' then FlushTableEvent
         when rec['eventName'] == 'checkpoint' then CheckPointEvent
         when rec['eventSource'] == 'aws:s3'
           S3ObjectEvent
@@ -67,13 +67,13 @@ module Bricolage
     end
 
 
-    class FlushEvent < Event
+    class FlushTableEvent < Event
 
-      def FlushEvent.create(delay_seconds:, table_name:)
-        super name: 'flush', delay_seconds: delay_seconds, table_name: table_name
+      def FlushTableEvent.create(table_name:)
+        super name: 'flushtable', table_name: table_name
       end
 
-      def FlushEvent.parse_sqs_record(msg, rec)
+      def FlushTableEvent.parse_sqs_record(msg, rec)
         {
           table_name: rec['tableName']
         }
