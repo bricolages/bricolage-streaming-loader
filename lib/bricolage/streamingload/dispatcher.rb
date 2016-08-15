@@ -56,6 +56,9 @@ module Bricolage
         Process.daemon(true) if opts.daemon?
         create_pid_file opts.pid_file_path if opts.pid_file_path
         dispatcher.event_loop
+      rescue Exception => e
+        alert_logger.error e.message
+        raise
       end
 
       def Dispatcher.new_logger(path, config)
