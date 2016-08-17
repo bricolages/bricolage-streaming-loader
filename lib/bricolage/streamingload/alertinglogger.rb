@@ -9,14 +9,14 @@ module Bricolage
         @sns_logger.level = Kernel.const_get("Logger").const_get(alert_level.upcase)
       end
 
-      def_delegator '@logger', :level
-      def_delegator '@logger', :level=
+      def_delegators '@logger', :level, :level=, :debug?, :info?, :warn?, :error?, :fatal?, :unknown?
 
       %w(log debug info warn error fatal unknown).each do |m|
         define_method(m) do |*args|
           [@logger, @sns_logger].map {|t| t.send(m, *args) }
         end
       end
+
     end
   end
 end
