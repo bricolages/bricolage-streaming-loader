@@ -55,6 +55,7 @@ module Bricolage
         }
       end
 
+      # Flushes multiple tables periodically
       def flush_tasks
         task_ids = nil
         @ctl_ds.open {|conn|
@@ -76,6 +77,24 @@ module Bricolage
             # (e.g. there are too many objects for one table), we must create
             # tasks repeatedly until there are no unassigned objects.
             until (ids = insert_tasks_force(conn)).empty?
+              insert_task_object_mappings(conn)
+              task_ids.concat ids
+            end
+          }
+        }
+        return task_ids.map {|id| LoadTask.create(task_id: id) }
+      end
+
+      # Flushes the all objects of the specified table immediately
+      # with no additional conditions, to create "table checkpoint".
+      def flush_table_force(table_name)
+        task_ids  = []
+        @ctl_ds.open {|conn|
+          conn.transaction {|txn|
+            # insert_task_object_mappings may not consume all saved objects
+            # (e.g. there are too many objects for one table), we must create
+            # tasks repeatedly until there are no unassigned objects.
+            until (ids = insert_table_task_force(conn, table_name)).empty?
               insert_task_object_mappings(conn)
               task_ids.concat ids
             end
@@ -181,6 +200,60 @@ module Bricolage
             ;
         EndSQL
 
+        @logger.info "Number of task created: #{task_ids.size}"
+        task_ids
+      end
+
+      def insert_table_task_force(conn, table_name)
+        task_ids = conn.query_values(<<-EndSQL)
+            insert into strload_tasks
+                ( task_class
+                , schema_name
+                , table_name
+                , submit_time
+                )
+            select
+                'streaming_load_v3'
+                , tbl.schema_name
+                , tbl.table_name
+                , current_timestamp
+            from
+                strload_tables tbl
+
+                -- The number of objects for each tables, which is not assigned to any task (> 0).
+                -- This subquery is covered by the index.
+                inner join (
+                    select
+                        data_source_id
+                        , count(*) as object_count
+                    from
+                        (
+                            select
+                                min(object_id) as object_id
+                                , object_url
+                            from
+                                strload_objects
+                            where
+                                data_source_id = #{s table_name}
+                            group by
+                                object_url
+                        ) uniq_objects
+                        inner join strload_objects using (object_id)
+                        left outer join strload_task_objects using (object_id)
+                    where
+                        task_id is null -- not assigned to a task
+                    group by
+                        data_source_id
+                ) obj
+                using (data_source_id)
+            where
+                -- does not check disabled
+                data_source_id = #{s table_name}
+            returning task_id
+            ;
+        EndSQL
+
+        # It must be 1
         @logger.info "Number of task created: #{task_ids.size}"
         task_ids
       end

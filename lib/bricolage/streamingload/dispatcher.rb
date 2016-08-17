@@ -122,16 +122,10 @@ module Bricolage
       def create_checkpoint
         logger.info "*** Creating checkpoint requested ***"
         logger.info "Force-flushing all objects..."
-        flush_all_tasks_immediately
+        tasks = @object_buffer.flush_tasks_force
+        send_tasks tasks
         logger.info "All objects flushed; shutting down..."
         @event_queue.initiate_terminate
-      end
-
-      def flush_all_tasks_immediately
-        tasks = @object_buffer.flush_tasks_force
-        tasks.each do |task|
-          @task_queue.put task
-        end
       end
 
       def handle_data(e)
@@ -147,7 +141,7 @@ module Bricolage
       def handle_dispatch(e)
         if @dispatch_message_id == e.message_id
           tasks = @object_buffer.flush_tasks
-          tasks.each {|task| @task_queue.put task }
+          send_tasks tasks
           set_dispatch_timer
         end
         # Delete this event immediately
@@ -157,6 +151,20 @@ module Bricolage
       def set_dispatch_timer
         res = @event_queue.send_message(DispatchEvent.create(delay_seconds: @dispatch_interval))
         @dispatch_message_id = res.message_id
+      end
+
+      def handle_flushtable(e)
+        logger.info "flushing #{e.table_name} requested"
+        tasks = @object_buffer.flush_table_force(e.table_name)
+        send_tasks tasks
+        # Delete this event immediately
+        @event_queue.delete_message(e)
+      end
+
+      def send_tasks(tasks)
+        tasks.each do |task|
+          @task_queue.put task
+        end
       end
 
     end
