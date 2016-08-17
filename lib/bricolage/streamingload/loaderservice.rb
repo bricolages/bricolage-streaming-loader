@@ -78,6 +78,8 @@ module Bricolage
         @logger = logger
       end
 
+      attr_reader :logger
+
       def event_loop
         @task_queue.handle_messages(handler: self, message_class: Task)
         @logger.info "shutdown gracefully"
