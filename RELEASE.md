@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.5.1
+
+- [fix] Fixes slow query
+
 ## version 0.5.0
 
 - [new] Introduces FLUSHTABLE dispatcher event
