@@ -274,16 +274,27 @@ module Bricolage
                     , obj.object_id
                     , load_batch_size
                 from
+                    -- unassigned objects
                     (
                         select
                             data_source_id
-                            , object_url
-                            , min(object_id) as object_id
+                            , uniq_objects.object_url
+                            , object_id
                         from
-                            strload_objects
-                        group by
-                            1, 2
-                    ) obj
+                            (
+                                select
+                                    min(object_id) as object_id
+                                    , object_url
+                                from
+                                    strload_objects
+                                group by
+                                    object_url
+                            ) uniq_objects
+                            inner join strload_objects using(object_id)
+                            left outer join strload_task_objects using(object_id)
+                        where
+                            task_id is null
+                     ) obj
 
                     -- tasks without objects
                     inner join (
@@ -297,16 +308,11 @@ module Bricolage
                             using (schema_name, table_name)
                         where
                             -- unassigned objects
-                            task_id not in (select task_id from strload_task_objects)
+                            task_id not in (select distinct task_id from strload_task_objects)
                         group by
                             1
                     ) task
                     using (data_source_id)
-
-                    left outer join strload_task_objects task_obj
-                    using (object_id)
-                where
-                    task_obj.object_id is null   -- unassigned to a task
                 ) as t
             where
                 object_count <= load_batch_size   -- limit number of objects assigned to single task
