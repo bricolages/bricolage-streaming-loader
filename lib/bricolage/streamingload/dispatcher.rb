@@ -85,6 +85,7 @@ module Bricolage
         @dispatch_interval = dispatch_interval
         @dispatch_message_id = nil
         @logger = logger
+        @dispatch_requested = false
         @checkpoint_requested = false
       end
 
@@ -99,9 +100,17 @@ module Bricolage
 
       # override
       def after_message_batch
+        # must be processed first
         @event_queue.process_async_delete
+
+        if @dispatch_requested
+          dispatch_tasks
+          @dispatch_requested = false
+        end
+
         if @checkpoint_requested
           create_checkpoint
+          @checkpoint_requested = false   # is needless, but reset it just in case
         end
       end
 
@@ -139,13 +148,18 @@ module Bricolage
       end
 
       def handle_dispatch(e)
+        # Dispatching tasks may takes 10 minutes or more, it can exceeds visibility timeout.
+        # To avoid this, delay dispatching until all events of current message batch are processed.
         if @dispatch_message_id == e.message_id
-          tasks = @object_buffer.flush_tasks
-          send_tasks tasks
-          set_dispatch_timer
+          @dispatch_requested = true
         end
-        # Delete this event immediately
-        @event_queue.delete_message(e)
+        @event_queue.delete_message_async(e)
+      end
+
+      def dispatch_tasks
+        tasks = @object_buffer.flush_tasks
+        send_tasks tasks
+        set_dispatch_timer
       end
 
       def set_dispatch_timer
