@@ -42,11 +42,14 @@ module Bricolage
 
     class ObjectBuffer
 
+      TASK_GENERATION_TIME_LIMIT = 30 #sec
+
       include SQLUtils
 
       def initialize(control_data_source:, logger:)
         @ctl_ds = control_data_source
         @logger = logger
+        @task_generation_time_limit = TASK_GENERATION_TIME_LIMIT
       end
 
       def put(obj)
@@ -57,11 +60,13 @@ module Bricolage
 
       # Flushes multiple tables periodically
       def flush_tasks
-        task_ids = nil
-        @ctl_ds.open {|conn|
-          conn.transaction {|txn|
-            task_ids = insert_tasks(conn)
-            insert_task_object_mappings(conn) unless task_ids.empty?
+        task_ids = []
+        warn_slow_task_generation {
+          @ctl_ds.open {|conn|
+            conn.transaction {|txn|
+              task_ids = insert_tasks(conn)
+              insert_task_object_mappings(conn) unless task_ids.empty?
+            }
           }
         }
         return task_ids.map {|id| LoadTask.create(task_id: id) }
@@ -200,7 +205,7 @@ module Bricolage
             ;
         EndSQL
 
-        @logger.info "Number of task created: #{task_ids.size}"
+        log_created_tasks task_ids
         task_ids
       end
 
@@ -254,7 +259,7 @@ module Bricolage
         EndSQL
 
         # It must be 1
-        @logger.info "Number of task created: #{task_ids.size}"
+        log_created_tasks(task_ids)
         task_ids
       end
 
@@ -328,6 +333,22 @@ module Bricolage
           yield
         ensure
           @logger.level = orig
+        end
+      end
+
+      def log_created_tasks(task_ids)
+        created_task_num = task_ids.size
+        @logger.info "Number of task created: #{created_task_num}"
+        @logger.info "Created task ids: #{task_ids}" if created_task_num > 0
+      end
+
+      def warn_slow_task_generation(&block)
+        start_time = Time.now
+        yield
+        exec_time = (Time.now - start_time)
+        if exec_time > @task_generation_time_limit
+          @logger.warn "Long task generation time:  #{exec_time}"
+          @task_generation_time_limit = @task_generation_time_limit * 1.1
         end
       end
 

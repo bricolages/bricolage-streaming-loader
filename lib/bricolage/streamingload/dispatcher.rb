@@ -92,6 +92,7 @@ module Bricolage
       attr_reader :logger
 
       def event_loop
+        logger.info "dispatcher started"
         set_dispatch_timer
         @event_queue.handle_messages(handler: self, message_class: Event)
         @event_queue.process_async_delete_force
@@ -148,6 +149,7 @@ module Bricolage
       end
 
       def handle_dispatch(e)
+        logger.info "dispatching tasks requested"
         # Dispatching tasks may takes 10 minutes or more, it can exceeds visibility timeout.
         # To avoid this, delay dispatching until all events of current message batch are processed.
         if @dispatch_message_id == e.message_id
