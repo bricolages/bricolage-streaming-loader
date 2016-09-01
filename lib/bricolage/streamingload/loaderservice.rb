@@ -81,6 +81,7 @@ module Bricolage
       attr_reader :logger
 
       def event_loop
+        @logger.info "loader started"
         @task_queue.handle_messages(handler: self, message_class: Task)
         @logger.info "shutdown gracefully"
       end
@@ -100,14 +101,18 @@ module Bricolage
         # 3. Try execute
         #   - Skip if the task has already been executed AND force = false
         loadtask = load_task(task.id, force: task.force)
-        return if loadtask.disabled # skip if disabled, but don't delete sqs msg
+        @logger.info "handling load task: task_id=#{task.id}"
+        if loadtask.disabled
+          @logger.info "skip disabled task: task_id=#{task.id}"
+          return
+        end
         execute_task(loadtask)
         # Delete load task immediately (do not use async delete)
         @task_queue.delete_message(task)
       end
 
       def execute_task(task)
-        @logger.info "handling load task: table=#{task.qualified_name} task_id=#{task.id}"
+        @logger.info "execute task: task_id=#{task.id} table=#{task.qualified_name}"
         loader = Loader.load_from_file(@ctx, @ctl_ds, task, logger: @logger)
         loader.execute
       end
