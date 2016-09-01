@@ -6,6 +6,7 @@ CREATE TABLE strload_objects (
   , message_id varchar(64) NOT NULL
   , event_time timestamp with time zone NOT NULL
   , submit_time timestamp with time zone NOT NULL
+  , loaded boolean DEFAULT false
   , CONSTRAINT strload_objects_pkey PRIMARY KEY (object_id)
 );
 CREATE INDEX strload_objects_object_url ON strload_objects (object_url);
