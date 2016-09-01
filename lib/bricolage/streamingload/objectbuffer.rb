@@ -54,7 +54,16 @@ module Bricolage
 
       def put(obj)
         @ctl_ds.open {|conn|
-          insert_object(conn, obj)
+          suppress_sql_logging {
+            conn.transaction {
+              object_id = insert_object(conn, obj)
+              if object_id
+                insert_task_objects(conn, object_id)
+              else
+                insert_dup_object(conn, obj)
+              end
+            }
+          }
         }
       end
 
@@ -65,7 +74,7 @@ module Bricolage
           @ctl_ds.open {|conn|
             conn.transaction {|txn|
               task_ids = insert_tasks(conn)
-              insert_task_object_mappings(conn) unless task_ids.empty?
+              update_task_object_mappings(conn, task_ids) unless task_ids.empty?
             }
           }
         }
@@ -78,11 +87,11 @@ module Bricolage
         task_ids  = []
         @ctl_ds.open {|conn|
           conn.transaction {|txn|
-            # insert_task_object_mappings may not consume all saved objects
+            # update_task_object_mappings may not consume all saved objects
             # (e.g. there are too many objects for one table), we must create
             # tasks repeatedly until there are no unassigned objects.
             until (ids = insert_tasks_force(conn)).empty?
-              insert_task_object_mappings(conn)
+              update_task_object_mappings(conn, ids)
               task_ids.concat ids
             end
           }
@@ -96,11 +105,11 @@ module Bricolage
         task_ids  = []
         @ctl_ds.open {|conn|
           conn.transaction {|txn|
-            # insert_task_object_mappings may not consume all saved objects
+            # update_task_object_mappings may not consume all saved objects
             # (e.g. there are too many objects for one table), we must create
             # tasks repeatedly until there are no unassigned objects.
             until (ids = insert_table_task_force(conn, table_name)).empty?
-              insert_task_object_mappings(conn)
+              update_task_object_mappings(conn, ids)
               task_ids.concat ids
             end
           }
@@ -111,52 +120,66 @@ module Bricolage
       private
 
       def insert_object(conn, obj)
-        suppress_sql_logging {
-          object_ids = conn.query_values(<<-EndSQL)
-              insert into strload_objects
-                  ( object_url
-                  , object_size
-                  , data_source_id
-                  , message_id
-                  , event_time
-                  , submit_time
-                  )
-              values
-                  ( #{s obj.url}
-                  , #{obj.size}
-                  , #{s obj.data_source_id}
-                  , #{s obj.message_id}
-                  , '#{obj.event_time}' AT TIME ZONE 'JST'
-                  , current_timestamp
-                  )
-              on conflict on constraint strload_objects_object_url
-              do nothing
-              returning object_id
-              ;
-          EndSQL
-          if object_ids.empty?
-            @logger.info "Duplicated object recieved: object_url=#{obj.url}"
-            conn.update(<<-EndSQL)
-                insert into strload_dup_objects
-                    ( object_url
-                    , object_size
-                    , data_source_id
-                    , message_id
-                    , event_time
-                    , submit_time
-                    )
-                values
-                    ( #{s obj.url}
-                    , #{obj.size}
-                    , #{s obj.data_source_id}
-                    , #{s obj.message_id}
-                    , '#{obj.event_time}' AT TIME ZONE 'JST'
-                    , current_timestamp
-                    )
-                ;
-            EndSQL
-          end
-        }
+        object_ids = conn.query_values(<<-EndSQL)
+            insert into strload_objects
+                ( object_url
+                , object_size
+                , data_source_id
+                , message_id
+                , event_time
+                , submit_time
+                )
+            values
+                ( #{s obj.url}
+                , #{obj.size}
+                , #{s obj.data_source_id}
+                , #{s obj.message_id}
+                , '#{obj.event_time}' AT TIME ZONE 'JST'
+                , current_timestamp
+                )
+            on conflict on constraint strload_objects_object_url
+            do nothing
+            returning object_id
+            ;
+        EndSQL
+        return object_ids.first
+      end
+
+      def insert_dup_object(conn, obj)
+        @logger.info "Duplicated object recieved: object_url=#{obj.url}"
+        conn.update(<<-EndSQL)
+            insert into strload_dup_objects
+                ( object_url
+                , object_size
+                , data_source_id
+                , message_id
+                , event_time
+                , submit_time
+                )
+            values
+                ( #{s obj.url}
+                , #{obj.size}
+                , #{s obj.data_source_id}
+                , #{s obj.message_id}
+                , '#{obj.event_time}' AT TIME ZONE 'JST'
+                , current_timestamp
+                )
+            ;
+        EndSQL
+      end
+
+      def insert_task_objects(conn, object_id)
+        conn.update(<<-EndSQL)
+            insert into strload_task_objects
+                ( task_id
+                , object_id
+                )
+            values
+                ( -1
+                , #{object_id}
+                )
+            ;
+        EndSQL
       end
 
       def insert_tasks_force(conn)
@@ -187,17 +210,13 @@ module Bricolage
                     from
                         (
                             select
-                                min(object_id) as object_id
-                                , object_url
+                                object_id
                             from
-                                strload_objects
-                            group by
-                                object_url
+                                strload_task_objects
+                            where
+                                task_id = -1
                         ) uniq_objects
                         inner join strload_objects using (object_id)
-                        left outer join strload_task_objects using (object_id)
-                    where
-                        task_id is null -- not assigned to a task
                     group by
                         data_source_id
                 ) obj
@@ -256,19 +275,13 @@ module Bricolage
                     from
                         (
                             select
-                                min(object_id) as object_id
-                                , object_url
+                                object_id
                             from
-                                strload_objects
+                                strload_task_objects
                             where
-                                data_source_id = #{s table_name}
-                            group by
-                                object_url
+                                task_id = -1
                         ) uniq_objects
                         inner join strload_objects using (object_id)
-                        left outer join strload_task_objects using (object_id)
-                    where
-                        task_id is null -- not assigned to a task
                     group by
                         data_source_id
                 ) obj
@@ -285,66 +298,40 @@ module Bricolage
         task_ids
       end
 
-      def insert_task_object_mappings(conn)
-        conn.update(<<-EndSQL)
-            insert into strload_task_objects
-                ( task_id
-                , object_id
-                )
-            select
-                task_id
-                , object_id
-            from (
-                select
-                    row_number() over (partition by task.task_id order by obj.object_id) as object_count
-                    , task.task_id
-                    , obj.object_id
-                    , load_batch_size
-                from
-                    -- unassigned objects
-                    (
-                        select
-                            data_source_id
-                            , uniq_objects.object_url
-                            , object_id
-                        from
-                            (
-                                select
-                                    min(object_id) as object_id
-                                    , object_url
-                                from
-                                    strload_objects
-                                group by
-                                    object_url
-                            ) uniq_objects
-                            inner join strload_objects using(object_id)
-                            left outer join strload_task_objects using(object_id)
-                        where
-                            task_id is null
-                     ) obj
-
-                    -- tasks without objects
-                    inner join (
-                        select
-                            tbl.data_source_id
-                            , min(task_id) as task_id   -- pick up oldest task
-                            , max(load_batch_size) as load_batch_size
-                        from
-                            strload_tasks
-                            inner join strload_tables tbl
-                            using (schema_name, table_name)
-                        where
-                            -- unassigned objects
-                            task_id not in (select distinct task_id from strload_task_objects)
-                        group by
-                            1
-                    ) task
-                    using (data_source_id)
-                ) as t
-            where
-                object_count <= load_batch_size   -- limit number of objects assigned to single task
-            ;
-        EndSQL
+      def update_task_object_mappings(conn, task_ids)
+        task_ids.each do |task_id|
+          conn.update(<<-EndSQL)
+              update strload_task_objects
+              set
+                  task_id = #{task_id}
+              where
+                  task_id = -1
+                  and object_id in (
+                      select
+                          object_id
+                      from (
+                          select
+                              object_id
+                              , data_souce_id
+                              , row_number() over(partition by data_souce_id order by object_id) as object_number
+                          from
+                              (select object_id from strload_task_objects where task_id = -1) t
+                              inner join strload_object
+                                using(object_id)
+                              inner join strload_tables
+                                using (data_souce_id)
+                          ) tsk_obj
+                          inner join strload_tables
+                              using(data_souce_id)
+                          inner join strload_tasks
+                              using(schema_name, table_name)
+                      where
+                          task_id = #{task_id}
+                          and object_number < load_batch_size
+                  )
+              ;
+          EndSQL
+        end
       end
 
       def suppress_sql_logging
