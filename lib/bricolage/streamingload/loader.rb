@@ -72,11 +72,13 @@ module Bricolage
             @connection.transaction {
               commit_work_table @params
               commit_job_result
+              update_loaded_flag
             }
           else
             @connection.transaction {
               load_objects @params.dest_table, manifest, @params.load_options_string
               commit_job_result
+              update_loaded_flag
             }
           end
         }
@@ -114,6 +116,26 @@ module Bricolage
       def commit_job_result
         @end_time = Time.now
         write_job_result 'success', ''
+      end
+
+      def update_loaded_flag
+        @ctl_ds.open {|conn|
+          conn.execute(<<-EndSQL)
+            update
+                strload_objects
+            set
+                loaded = true
+            where
+                object_id in (
+                  select
+                      object_id
+                  from
+                      strload_task_objects
+                  where task_id = (select task_id from strload_jobs where job_id #{@job_id})
+                )
+            ;
+          EndSQL
+        }
       end
 
       MAX_MESSAGE_LENGTH = 1000
