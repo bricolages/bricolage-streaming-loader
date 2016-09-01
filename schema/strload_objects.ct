@@ -8,5 +8,5 @@ CREATE TABLE strload_objects (
   , submit_time timestamp with time zone NOT NULL
   , loaded boolean DEFAULT false
   , CONSTRAINT strload_objects_pkey PRIMARY KEY (object_id)
+  , CONSTRAINT strload_objects_object_url UNIQUE (object_url)
 );
-CREATE INDEX strload_objects_object_url ON strload_objects (object_url);

@@ -112,7 +112,7 @@ module Bricolage
 
       def insert_object(conn, obj)
         suppress_sql_logging {
-          conn.update(<<-EndSQL)
+          object_ids = conn.query_values(<<-EndSQL)
               insert into strload_objects
                   ( object_url
                   , object_size
@@ -121,19 +121,41 @@ module Bricolage
                   , event_time
                   , submit_time
                   )
-              select
-                  #{s obj.url}
+              values
+                  ( #{s obj.url}
                   , #{obj.size}
                   , #{s obj.data_source_id}
                   , #{s obj.message_id}
                   , '#{obj.event_time}' AT TIME ZONE 'JST'
                   , current_timestamp
-              from
-                  strload_tables
-              where
-                  data_source_id = #{s obj.data_source_id}
+                  )
+              on conflict on constraint strload_objects_object_url
+              do nothing
+              returning object_id
               ;
           EndSQL
+          if object_ids.empty?
+            @logger.info "Duplicated object recieved: object_url=#{obj.url}"
+            conn.update(<<-EndSQL)
+                insert into strload_dup_objects
+                    ( object_url
+                    , object_size
+                    , data_source_id
+                    , message_id
+                    , event_time
+                    , submit_time
+                    )
+                values
+                    ( #{s obj.url}
+                    , #{obj.size}
+                    , #{s obj.data_source_id}
+                    , #{s obj.message_id}
+                    , '#{obj.event_time}' AT TIME ZONE 'JST'
+                    , current_timestamp
+                    )
+                ;
+            EndSQL
+          end
         }
       end
 
