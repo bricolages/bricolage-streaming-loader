@@ -29,16 +29,16 @@ module Bricolage
         config = YAML.load(File.read(config_path))
         logger = opts.log_file_path ? new_logger(opts.log_file_path, config) : nil
         ctx = Context.for_application('.', environment: opts.environment, logger: logger)
-        event_queue = ctx.get_data_source('sqs', config.fetch('event-queue-ds'))
-        task_queue = ctx.get_data_source('sqs', config.fetch('task-queue-ds'))
+        event_queue = ctx.get_data_source('sqs', config.fetch('event-queue-ds', 'sqs_event'))
+        task_queue = ctx.get_data_source('sqs', config.fetch('task-queue-ds', 'sqs_task'))
         alert_logger = AlertingLogger.new(
           logger: ctx.logger,
-          sns_datasource: ctx.get_data_source('sns', config.fetch('sns-ds')),
+          sns_datasource: ctx.get_data_source('sns', config.fetch('sns-ds', 'sns')),
           alert_level: config.fetch('alert-level', 'warn')
         )
 
         object_buffer = ObjectBuffer.new(
-          control_data_source: ctx.get_data_source('sql', config.fetch('ctl-postgres-ds')),
+          control_data_source: ctx.get_data_source('sql', config.fetch('ctl-postgres-ds', 'db_data')),
           logger: alert_logger
         )
 

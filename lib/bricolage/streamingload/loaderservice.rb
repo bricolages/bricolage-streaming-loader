@@ -26,20 +26,20 @@ module Bricolage
         config = YAML.load(File.read(config_path))
         logger = opts.log_file_path ? new_logger(opts.log_file_path, config) : nil
         ctx = Context.for_application(opts.working_dir, environment: opts.environment, logger: logger)
-        redshift_ds = ctx.get_data_source('sql', config.fetch('redshift-ds'))
-        task_queue = ctx.get_data_source('sqs', config.fetch('task-queue-ds'))
+        redshift_ds = ctx.get_data_source('sql', config.fetch('redshift-ds', 'db_data'))
+        task_queue = ctx.get_data_source('sqs', config.fetch('task-queue-ds', 'sqs_task'))
         raw_logger = logger = ctx.logger
         if config.key?('alert-level')
           logger = AlertingLogger.new(
             logger: raw_logger,
-            sns_datasource: ctx.get_data_source('sns', config.fetch('sns-ds')),
+            sns_datasource: ctx.get_data_source('sns', config.fetch('sns-ds', 'sns')),
             alert_level: config.fetch('alert-level', 'warn')
           )
         end
 
         service = new(
           context: ctx,
-          control_data_source: ctx.get_data_source('sql', config.fetch('ctl-postgres-ds')),
+          control_data_source: ctx.get_data_source('sql', config.fetch('ctl-postgres-ds', 'db_ctl')),
           data_source: redshift_ds,
           task_queue: task_queue,
           working_dir: opts.working_dir,
