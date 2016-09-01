@@ -72,13 +72,11 @@ module Bricolage
             @connection.transaction {
               commit_work_table @params
               commit_job_result
-              update_loaded_flag
             }
           else
             @connection.transaction {
               load_objects @params.dest_table, manifest, @params.load_options_string
               commit_job_result
-              update_loaded_flag
             }
           end
         }
@@ -115,27 +113,30 @@ module Bricolage
 
       def commit_job_result
         @end_time = Time.now
-        write_job_result 'success', ''
+        @ctl_ds.open {|conn|
+          conn.transaction {
+            write_job_result conn 'success', ''
+            update_loaded_flag conn
+          }
+        }
       end
 
-      def update_loaded_flag
-        @ctl_ds.open {|conn|
-          conn.execute(<<-EndSQL)
-            update
-                strload_objects
-            set
-                loaded = true
-            where
-                object_id in (
-                  select
-                      object_id
-                  from
-                      strload_task_objects
-                  where task_id = (select task_id from strload_jobs where job_id #{@job_id})
-                )
-            ;
-          EndSQL
-        }
+      def update_loaded_flag(connection)
+        connection.execute(<<-EndSQL)
+          update
+              strload_objects
+          set
+              loaded = true
+          where
+              object_id in (
+                select
+                    object_id
+                from
+                    strload_task_objects
+                where task_id = (select task_id from strload_jobs where job_id #{@job_id})
+              )
+          ;
+        EndSQL
       end
 
       MAX_MESSAGE_LENGTH = 1000
@@ -143,21 +144,21 @@ module Bricolage
       def write_job_error(status, message)
         @end_time = Time.now
         @logger.warn message.lines.first
-        write_job_result status, message.lines.first.strip[0, MAX_MESSAGE_LENGTH]
+        @ctl_ds.open {|conn|
+          write_job_result conn, status, message.lines.first.strip[0, MAX_MESSAGE_LENGTH]
+        }
       end
 
-      def write_job_result(status, message)
-        @ctl_ds.open {|conn|
-          conn.execute(<<-EndSQL)
-            update
-                strload_jobs
-            set
-                (status, finish_time, message) = (#{s status}, current_timestamp, #{s message})
-            where
-                job_id = #{@job_id}
-            ;
-          EndSQL
-        }
+      def write_job_result(connection, status, message)
+        connection.execute(<<-EndSQL)
+          update
+              strload_jobs
+          set
+              (status, finish_time, message) = (#{s status}, current_timestamp, #{s message})
+          where
+              job_id = #{@job_id}
+          ;
+        EndSQL
       end
 
     end
