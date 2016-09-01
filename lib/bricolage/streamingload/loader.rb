@@ -115,7 +115,7 @@ module Bricolage
         @end_time = Time.now
         @ctl_ds.open {|conn|
           conn.transaction {
-            write_job_result conn 'success', ''
+            write_job_result conn, 'success', ''
             update_loaded_flag conn
           }
         }
@@ -133,7 +133,7 @@ module Bricolage
                     object_id
                 from
                     strload_task_objects
-                where task_id = (select task_id from strload_jobs where job_id #{@job_id})
+                where task_id = (select task_id from strload_jobs where job_id = #{@job_id})
               )
           ;
         EndSQL
