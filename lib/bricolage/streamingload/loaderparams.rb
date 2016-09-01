@@ -1,3 +1,4 @@
+require 'bricolage/job'
 require 'bricolage/rubyjobclass'
 require 'bricolage/psqldatasource'
 
@@ -60,8 +61,8 @@ module Bricolage
         @task.table
       end
 
-      def force
-        @task.force
+      def force?
+        @task.force?
       end
 
       def object_urls

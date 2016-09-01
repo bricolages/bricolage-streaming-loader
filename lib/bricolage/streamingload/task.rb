@@ -35,7 +35,7 @@ module Bricolage
       def LoadTask.parse_sqs_record(msg, rec)
         {
           task_id: rec['taskId'],
-          force: rec['force'],
+          force: (rec['force'].to_s == 'true')
         }
       end
 
@@ -94,7 +94,11 @@ module Bricolage
         @disabled = disabled
       end
 
-      attr_reader :id, :force
+      attr_reader :id
+
+      def force?
+        !!@force
+      end
 
       #
       # For writer only
