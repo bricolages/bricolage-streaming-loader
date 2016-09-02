@@ -60,26 +60,20 @@ module Bricolage
       end
 
       def do_load
-        ManifestFile.create(
-          @params.ctl_bucket,
-          job_id: @job_id,
-          object_urls: @params.object_urls,
-          logger: @logger
-        ) {|manifest|
-          if @params.enable_work_table?
-            @connection.transaction {|txn|
-              # NOTE: This transaction ends with truncation, this DELETE does nothing
-              # from the second time.  So don't worry about DELETE cost here.
-              @connection.execute("delete from #{@params.work_table}")
-              load_objects @params.work_table, manifest, @params.load_options_string
-              commit_work_table txn, @params
-            }
-            commit_job_result
-          else
-            load_objects @params.dest_table, manifest, @params.load_options_string
-            commit_job_result
-          end
-        }
+        manifest = ManifestFile.create(@params.ctl_bucket, job_id: @job_id, object_urls: @params.object_urls, logger: @logger)
+        if @params.enable_work_table?
+          @connection.transaction {|txn|
+            # NOTE: This transaction ends with truncation, this DELETE does nothing
+            # from the second time.  So don't worry about DELETE cost here.
+            @connection.execute("delete from #{@params.work_table}")
+            load_objects @params.work_table, manifest, @params.load_options_string
+            commit_work_table txn, @params
+          }
+          commit_job_result
+        else
+          load_objects @params.dest_table, manifest, @params.load_options_string
+          commit_job_result
+        end
       rescue JobFailure => ex
         write_job_error 'failure', ex.message
         raise
