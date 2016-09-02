@@ -31,7 +31,7 @@ from
     left outer join strload_jobs j
         using (task_id)
     left outer join strload_tables tbl
-        on (t.schema_name, t.table_name) = (tbl.schema_name, tbl.table_name)
+        using (table_id)
 order by
     task_id
     , job_id

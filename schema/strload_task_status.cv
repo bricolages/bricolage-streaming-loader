@@ -34,9 +34,9 @@ from
                 ) latest_job
                 on job_id = latest_job_id
         ) jobs
-        using(task_id)
+        using (task_id)
     left outer join strload_tables tbl
-        on (tsk.schema_name, tsk.table_name) = (tbl.schema_name, tbl.table_name)
+        using (table_id)
 order by
     task_id
 ;

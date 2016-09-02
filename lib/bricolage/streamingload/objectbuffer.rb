@@ -195,14 +195,12 @@ module Bricolage
         task_ids = conn.query_values(<<-EndSQL)
             insert into strload_tasks
                 ( task_class
-                , schema_name
-                , table_name
+                , table_id
                 , submit_time
                 )
             select
                 'streaming_load_v3'
-                , tbl.schema_name
-                , tbl.table_name
+                , tbl.table_id
                 , current_timestamp
             from
                 strload_tables tbl
@@ -224,15 +222,14 @@ module Bricolage
                 -- preceeding task's submit time
                 left outer join (
                     select
-                        schema_name
-                        , table_name
+                        table_id
                         , max(submit_time) as latest_submit_time
                     from
                         strload_tasks
                     group by
-                        schema_name, table_name
+                        table_id
                 ) task
-                using (schema_name, table_name)
+                using (table_id)
             where
                 not tbl.disabled -- not disabled
                 and (
@@ -253,14 +250,12 @@ module Bricolage
         task_ids = conn.query_values(<<-EndSQL)
             insert into strload_tasks
                 ( task_class
-                , schema_name
-                , table_name
+                , table_id
                 , submit_time
                 )
             select
                 'streaming_load_v3'
-                , tbl.schema_name
-                , tbl.table_name
+                , tbl.table_id
                 , current_timestamp
             from
                 strload_tables tbl
@@ -298,7 +293,7 @@ module Bricolage
                 task_id = tasks.task_id
             from
                 strload_tasks tasks
-                inner join strload_tables tables using (schema_name, table_name)
+                inner join strload_tables tables using (table_id)
                 inner join (
                     select
                         object_id

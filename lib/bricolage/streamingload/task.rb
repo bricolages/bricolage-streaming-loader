@@ -49,7 +49,7 @@ module Bricolage
           from
               strload_tasks tsk
               inner join strload_tables tbl
-                  using(schema_name, table_name)
+                  using(table_id)
           where
               task_id = #{task_id}
           ;
