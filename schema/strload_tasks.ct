@@ -7,3 +7,4 @@ CREATE TABLE strload_tasks (
   , CONSTRAINT strload_tasks_pkey PRIMARY KEY (task_id)
 )
 ;
+CREATE INDEX strload_tasks_schema_table ON strload_tasks (schema_name, table_name);

@@ -74,7 +74,10 @@ module Bricolage
           @ctl_ds.open {|conn|
             conn.transaction {|txn|
               task_ids = insert_tasks(conn)
-              update_task_object_mappings(conn, task_ids) unless task_ids.empty?
+              unless task_ids.empty?
+                update_task_object_mappings(conn, task_ids)
+                log_mapped_object_num(conn, task_ids)
+              end
             }
           }
         }
@@ -92,6 +95,7 @@ module Bricolage
             # tasks repeatedly until there are no unassigned objects.
             until (ids = insert_tasks_force(conn)).empty?
               update_task_object_mappings(conn, ids)
+              log_mapped_object_num(conn, ids)
               task_ids.concat ids
             end
           }
@@ -110,6 +114,7 @@ module Bricolage
             # tasks repeatedly until there are no unassigned objects.
             until (ids = insert_table_task_force(conn, table_name)).empty?
               update_task_object_mappings(conn, ids)
+              log_mapped_object_num(conn, ids)
               task_ids.concat ids
             end
           }
@@ -299,38 +304,52 @@ module Bricolage
       end
 
       def update_task_object_mappings(conn, task_ids)
-        task_ids.each do |task_id|
-          conn.update(<<-EndSQL)
-              update strload_task_objects
-              set
-                  task_id = #{task_id}
-              where
-                  task_id = -1
-                  and object_id in (
-                      select
-                          object_id
-                      from (
-                          select
-                              object_id
-                              , data_souce_id
-                              , row_number() over(partition by data_souce_id order by object_id) as object_number
-                          from
-                              (select object_id from strload_task_objects where task_id = -1) t
-                              inner join strload_object
-                                using(object_id)
-                              inner join strload_tables
-                                using (data_souce_id)
-                          ) tsk_obj
-                          inner join strload_tables
-                              using(data_souce_id)
-                          inner join strload_tasks
-                              using(schema_name, table_name)
-                      where
-                          task_id = #{task_id}
-                          and object_number < load_batch_size
-                  )
-              ;
-          EndSQL
+        conn.update(<<-EndSQL)
+            update strload_task_objects dst
+            set
+                task_id = tasks.task_id
+            from (
+                select
+                    object_id
+                    , data_source_id
+                    , row_number() over(partition by data_source_id order by object_id) as object_number
+                from
+                    (select object_id from strload_task_objects where task_id = -1) t
+                    inner join strload_objects
+                        using (object_id)
+                    inner join strload_tables
+                        using (data_source_id)
+                ) tsk_obj
+                inner join strload_tables tables
+                    using (data_source_id)
+                inner join strload_tasks tasks
+                    using (schema_name, table_name)
+            where
+                dst.task_id = -1
+                and tasks.task_id in (#{task_ids.join(",")})
+                and dst.object_id = tsk_obj.object_id
+                and tsk_obj.object_number < tables.load_batch_size
+            returning(dst.task_id)
+            ;
+        EndSQL
+      end
+
+      def log_mapped_object_num(conn, task_ids)
+        # This method is required since UPDATE does not "returning" multiple values
+        rows = conn.query_values(<<-EndSQL)
+            select
+                task_id
+                , count(*)
+            from
+                strload_task_objects
+            where
+                task_id in (#{task_ids.join(',')})
+            group by
+                task_id
+            ;
+        EndSQL
+        rows.each_slice(2) do |row|
+          @logger.info "Number of objects assigned to task: task_id=#{row[0]} object_count=#{row[1]}"
         end
       end
 

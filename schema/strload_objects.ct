@@ -10,3 +10,4 @@ CREATE TABLE strload_objects (
   , CONSTRAINT strload_objects_pkey PRIMARY KEY (object_id)
   , CONSTRAINT strload_objects_object_url UNIQUE (object_url)
 );
+CREATE INDEX strload_objects_data_source_id ON strload_objects (data_source_id);
