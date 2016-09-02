@@ -6,7 +6,12 @@ module Bricolage
 
       def ManifestFile.create(ds, job_id:, object_urls:, logger:, noop: false, &block)
         manifest = new(ds, job_id, object_urls, logger: logger, noop: noop)
-        manifest.create_temporary(&block)
+        if block
+          manifest.create_temporary(&block)
+        else
+          manifest.put
+          return manifest
+        end
       end
 
       def initialize(ds, job_id, object_urls, logger:, noop: false)
@@ -22,7 +27,9 @@ module Bricolage
       end
 
       def name
-        @name ||= "manifest-#{@job_id}.json"
+        return @name if @name
+        now =Time.now
+        "#{now.strftime('%Y/%m/%d')}/manifest-#{now.strftime('%H%M%S')}-#{@job_id}.json"
       end
 
       def url
