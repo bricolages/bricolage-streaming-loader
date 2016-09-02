@@ -67,17 +67,17 @@ module Bricolage
           logger: @logger
         ) {|manifest|
           if @params.enable_work_table?
-            prepare_work_table @params.work_table
-            load_objects @params.work_table, manifest, @params.load_options_string
-            @connection.transaction {
-              commit_work_table @params
-              commit_job_result
+            @connection.transaction {|txn|
+              # NOTE: This transaction ends with truncation, this DELETE does nothing
+              # from the second time.  So don't worry about DELETE cost here.
+              @connection.execute("delete from #{@params.work_table}")
+              load_objects @params.work_table, manifest, @params.load_options_string
+              commit_work_table txn, @params
             }
+            commit_job_result
           else
-            @connection.transaction {
-              load_objects @params.dest_table, manifest, @params.load_options_string
-              commit_job_result
-            }
+            load_objects @params.dest_table, manifest, @params.load_options_string
+            commit_job_result
           end
         }
       rescue JobFailure => ex
@@ -86,10 +86,6 @@ module Bricolage
       rescue Exception => ex
         write_job_error 'error', ex.message
         raise
-      end
-
-      def prepare_work_table(work_table)
-        @connection.execute("truncate #{work_table}")
       end
 
       def load_objects(dest_table, manifest, options)
@@ -106,9 +102,9 @@ module Bricolage
         @logger.info "load succeeded: #{manifest.url}"
       end
 
-      def commit_work_table(params)
+      def commit_work_table(txn, params)
         @connection.execute(params.sql_source)
-        # keep work table records for later tracking
+        txn.truncate_and_commit(params.work_table)
       end
 
       def commit_job_result
