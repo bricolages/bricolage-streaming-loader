@@ -213,15 +213,9 @@ module Bricolage
                         data_source_id
                         , count(*) as object_count
                     from
-                        (
-                            select
-                                object_id
-                            from
-                                strload_task_objects
-                            where
-                                task_id = -1
-                        ) uniq_objects
-                        inner join strload_objects using (object_id)
+                        strload_objects
+                    where
+                        object_id in (select object_id from strload_task_objects where task_id = -1)
                     group by
                         data_source_id
                 ) obj
@@ -244,8 +238,8 @@ module Bricolage
                 and (
                     #{force ? "true or" : ""}                                                      -- Creates tasks with no conditions if forced
                     obj.object_count > tbl.load_batch_size                                         -- batch_size exceeded?
-                    or extract(epoch from current_timestamp - latest_submit_time) > load_interval  -- load_interval exceeded?
-                    or latest_submit_time is null                                                  -- no previous tasks?
+                    or extract(epoch from current_timestamp - task.latest_submit_time) > tbl.load_interval  -- load_interval exceeded?
+                    or task.latest_submit_time is null                                             -- no previous tasks?
                 )
             returning task_id
             ;
@@ -278,15 +272,9 @@ module Bricolage
                         data_source_id
                         , count(*) as object_count
                     from
-                        (
-                            select
-                                object_id
-                            from
-                                strload_task_objects
-                            where
-                                task_id = -1
-                        ) uniq_objects
-                        inner join strload_objects using (object_id)
+                        strload_objects
+                    where
+                        object_id in (select object_id from strload_task_objects where task_id = -1)
                     group by
                         data_source_id
                 ) obj
@@ -308,28 +296,25 @@ module Bricolage
             update strload_task_objects dst
             set
                 task_id = tasks.task_id
-            from (
-                select
-                    object_id
-                    , data_source_id
-                    , row_number() over(partition by data_source_id order by object_id) as object_number
-                from
-                    (select object_id from strload_task_objects where task_id = -1) t
-                    inner join strload_objects
-                        using (object_id)
-                    inner join strload_tables
-                        using (data_source_id)
+            from
+                strload_tasks tasks
+                inner join strload_tables tables using (schema_name, table_name)
+                inner join (
+                    select
+                        object_id
+                        , data_source_id
+                        , row_number() over (partition by data_source_id order by object_id) as object_seq
+                    from
+                        strload_objects
+                    where
+                        object_id in (select object_id from strload_task_objects where task_id = -1)
                 ) tsk_obj
-                inner join strload_tables tables
-                    using (data_source_id)
-                inner join strload_tasks tasks
-                    using (schema_name, table_name)
+                using (data_source_id)
             where
                 dst.task_id = -1
                 and tasks.task_id in (#{task_ids.join(",")})
                 and dst.object_id = tsk_obj.object_id
-                and tsk_obj.object_number < tables.load_batch_size
-            returning(dst.task_id)
+                and tsk_obj.object_seq <= tables.load_batch_size
             ;
         EndSQL
       end
@@ -348,8 +333,8 @@ module Bricolage
                 task_id
             ;
         EndSQL
-        rows.each_slice(2) do |row|
-          @logger.info "Number of objects assigned to task: task_id=#{row[0]} object_count=#{row[1]}"
+        rows.each_slice(2) do |task_id, object_count|
+          @logger.info "Number of objects assigned to task: task_id=#{task_id} object_count=#{object_count}"
         end
       end
 
