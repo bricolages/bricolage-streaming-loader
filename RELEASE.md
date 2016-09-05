@@ -1,5 +1,16 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.6.0
+
+- [CHANGE] Adds loaded column to strload_objects table to record if the object is really loaded or not.
+- [CHANGE] Now strload_objects' object_url is unique.  Duplicated objects are stored in another table, strload_dup_objects.
+- [CHANGE] Now strload_table has table_id column, which is the primary key.
+- [new] Loader daemon supports new command line option --working-dir, to support symbolic linked path, such as Capistrano deploy target (current/).
+- [new] Keeps Redshift manifest file for later inspection.
+- [enhancement] Reduces the number of Redshift writer transactions (1 transaction for 1 loading).
+- [enhancement] Delay dispatching tasks until current event batch is processed, to avoid unexpected visibility timeout.
+- [enhancement] Adds more logging messages.
+
 ## version 0.5.1
 
 - [fix] Fixes slow query
