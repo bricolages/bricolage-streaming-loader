@@ -106,6 +106,12 @@ module Bricolage
       end
 
       # message handler
+      def handle_unknown(task)
+        @logger.warn "unknown task: #{task.message_body}"
+        @task_queue.delete_message task
+      end
+
+      # message handler
       def handle_streaming_load_v3(task)
         Dir.chdir(@working_dir) {
           loadtask = load_task(task.id, force: task.force?)

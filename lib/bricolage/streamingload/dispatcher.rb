@@ -115,6 +115,11 @@ module Bricolage
         end
       end
 
+      def handle_unknown(e)
+        logger.warn "unknown event: #{e.message_body}"
+        @event_queue.delete_message_async(e)
+      end
+
       def handle_shutdown(e)
         @event_queue.initiate_terminate
         # Delete this event immediately
