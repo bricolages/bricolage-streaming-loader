@@ -1,5 +1,13 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.6.1
+
+- [fix] dispatcher: Default ctl data source was wrong.
+- [fix] dispatcher: Detects S3 events by "s3" attribute instead of "eventSource" attribute, to allow fake S3 events (from non-S3 system).
+- [fix] dispatcher: SNS alert is now optional.
+- [fix] dispatcher: Correctly deletes unknown format messages.
+- [enhancement] Adds more logging messages.
+
 ## version 0.6.0
 
 - [CHANGE] Adds loaded column to strload_objects table to record if the object is really loaded or not.
