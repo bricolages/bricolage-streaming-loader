@@ -10,3 +10,4 @@ drop table if exists strload_jobs cascade;
 \i schema/strload_tasks.ct
 \i schema/strload_jobs.ct
 \i schema/strload_stats.cv
+\i schema/strload_task_status.cv
