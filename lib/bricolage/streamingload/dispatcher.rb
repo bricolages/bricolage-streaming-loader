@@ -41,7 +41,7 @@ module Bricolage
         end
 
         object_buffer = ObjectBuffer.new(
-          control_data_source: ctx.get_data_source('sql', config.fetch('ctl-postgres-ds', 'db_data')),
+          control_data_source: ctx.get_data_source('sql', config.fetch('ctl-postgres-ds', 'db_ctl')),
           logger: logger
         )
 
