@@ -27,19 +27,22 @@ module Bricolage
         end
         config_path, * = opts.rest_arguments
         config = YAML.load(File.read(config_path))
-        logger = opts.log_file_path ? new_logger(opts.log_file_path, config) : nil
-        ctx = Context.for_application('.', environment: opts.environment, logger: logger)
+        log = opts.log_file_path ? new_logger(opts.log_file_path, config) : nil
+        ctx = Context.for_application('.', environment: opts.environment, logger: log)
+        logger = raw_logger = ctx.logger
         event_queue = ctx.get_data_source('sqs', config.fetch('event-queue-ds', 'sqs_event'))
         task_queue = ctx.get_data_source('sqs', config.fetch('task-queue-ds', 'sqs_task'))
-        alert_logger = AlertingLogger.new(
-          logger: ctx.logger,
-          sns_datasource: ctx.get_data_source('sns', config.fetch('sns-ds', 'sns')),
-          alert_level: config.fetch('alert-level', 'warn')
-        )
+        if config['alert-level']
+          logger = AlertingLogger.new(
+            logger: raw_logger,
+            sns_datasource: ctx.get_data_source('sns', config.fetch('sns-ds', 'sns')),
+            alert_level: config.fetch('alert-level', 'warn')
+          )
+        end
 
         object_buffer = ObjectBuffer.new(
           control_data_source: ctx.get_data_source('sql', config.fetch('ctl-postgres-ds', 'db_data')),
-          logger: alert_logger
+          logger: logger
         )
 
         url_patterns = URLPatterns.for_config(config.fetch('url_patterns'))
@@ -50,14 +53,14 @@ module Bricolage
           object_buffer: object_buffer,
           url_patterns: url_patterns,
           dispatch_interval: 60,
-          logger: alert_logger
+          logger: logger
         )
 
         Process.daemon(true) if opts.daemon?
         create_pid_file opts.pid_file_path if opts.pid_file_path
         dispatcher.event_loop
       rescue Exception => e
-        alert_logger.error e.message
+        logger.error e.message
         raise
       end
 
