@@ -60,7 +60,8 @@ module Bricolage
         create_pid_file opts.pid_file_path if opts.pid_file_path
         dispatcher.event_loop
       rescue Exception => e
-        logger.error e.message
+        logger.exception e
+        logger.error "dispatcher abort: pid=#{$$}"
         raise
       end
 
@@ -95,11 +96,11 @@ module Bricolage
       attr_reader :logger
 
       def event_loop
-        logger.info "dispatcher started"
+        logger.info "*** dispatcher started: pid=#{$$}"
         set_dispatch_timer
         @event_queue.handle_messages(handler: self, message_class: Event)
         @event_queue.process_async_delete_force
-        logger.info "shutdown gracefully"
+        logger.info "*** shutdown gracefully: pid=#{$$}"
       end
 
       # override
@@ -108,6 +109,7 @@ module Bricolage
         @event_queue.process_async_delete
 
         if @dispatch_requested
+          logger.info "*** dispatch requested"
           dispatch_tasks
           @dispatch_requested = false
         end
@@ -124,6 +126,7 @@ module Bricolage
       end
 
       def handle_shutdown(e)
+        logger.info "*** shutdown requested"
         @event_queue.initiate_terminate
         # Delete this event immediately
         @event_queue.delete_message(e)
@@ -138,7 +141,7 @@ module Bricolage
       end
 
       def create_checkpoint
-        logger.info "*** Creating checkpoint requested ***"
+        logger.info "*** checkpoint requested"
         logger.info "Force-flushing all objects..."
         tasks = @object_buffer.flush_tasks_force
         send_tasks tasks
@@ -157,7 +160,6 @@ module Bricolage
       end
 
       def handle_dispatch(e)
-        logger.info "dispatching tasks requested"
         # Dispatching tasks may takes 10 minutes or more, it can exceeds visibility timeout.
         # To avoid this, delay dispatching until all events of current message batch are processed.
         if @dispatch_message_id == e.message_id
@@ -178,7 +180,7 @@ module Bricolage
       end
 
       def handle_flushtable(e)
-        logger.info "flushing #{e.table_name} requested"
+        logger.info "*** flushtable requested: table=#{e.table_name}"
         tasks = @object_buffer.flush_table_force(e.table_name)
         send_tasks tasks
         # Delete this event immediately
