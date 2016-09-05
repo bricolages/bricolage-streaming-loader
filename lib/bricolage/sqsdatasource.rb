@@ -349,7 +349,7 @@ module Bricolage
     def SQSMessage.for_sqs_result(result)
       result.messages.flat_map {|msg|
         body = JSON.parse(msg.body)
-        records = body['Records'] or next []
+        records = body['Records'] or next [UnknownSQSMessage.for_sqs_record(msg, nil)]
         records.map {|rec| get_concrete_class(msg, rec).for_sqs_record(msg, rec) }
       }
     end
@@ -361,15 +361,19 @@ module Bricolage
     end
 
     def SQSMessage.parse_sqs_record(msg, rec)
-      time_str = rec['eventTime']
-      tm = time_str ? (Time.parse(time_str) rescue nil) : nil
       {
         message_id: msg.message_id,
         receipt_handle: msg.receipt_handle,
-        name: rec['eventName'],
-        time: tm,
-        source: rec['eventSource']
+        name: (rec ? rec['eventName'] : nil),
+        time: get_event_time(rec),
+        source: (rec ? rec['eventSource'] : nil)
       }
+    end
+
+    def SQSMessage.get_event_time(rec)
+      return nil unless rec
+      str = rec['eventTime'] or return nil
+      Time.parse(str) rescue nil
     end
 
     def initialize(name:, time:, source:,
@@ -415,5 +419,24 @@ module Bricolage
     end
 
   end   # class SQSMessage
+
+
+  class UnknownSQSMessage < SQSMessage
+
+    def UnknownSQSMessage.parse_sqs_record(msg, _rec)
+      { message_body: msg.body }
+    end
+
+    def message_type
+      'unknown'
+    end
+
+    def init_message(message_body:)
+      @message_body = message_body
+    end
+
+    attr_reader :message_body
+
+  end   # class UnknownSQSMessage
 
 end   # module Bricolage

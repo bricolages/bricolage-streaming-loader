@@ -10,8 +10,7 @@ module Bricolage
       def Task.get_concrete_class(msg, rec)
         case
         when rec['eventName'] == 'streaming_load_v3' then LoadTask
-        else
-          raise "[FATAL] unknown SQS message record: eventSource=#{rec['eventSource']} event=#{rec['eventName']} message_id=#{msg.message_id}"
+        else UnknownSQSMessage
         end
       end
 

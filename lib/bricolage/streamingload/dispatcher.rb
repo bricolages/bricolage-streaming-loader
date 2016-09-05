@@ -27,19 +27,22 @@ module Bricolage
         end
         config_path, * = opts.rest_arguments
         config = YAML.load(File.read(config_path))
-        logger = opts.log_file_path ? new_logger(opts.log_file_path, config) : nil
-        ctx = Context.for_application('.', environment: opts.environment, logger: logger)
+        log = opts.log_file_path ? new_logger(opts.log_file_path, config) : nil
+        ctx = Context.for_application('.', environment: opts.environment, logger: log)
+        logger = raw_logger = ctx.logger
         event_queue = ctx.get_data_source('sqs', config.fetch('event-queue-ds', 'sqs_event'))
         task_queue = ctx.get_data_source('sqs', config.fetch('task-queue-ds', 'sqs_task'))
-        alert_logger = AlertingLogger.new(
-          logger: ctx.logger,
-          sns_datasource: ctx.get_data_source('sns', config.fetch('sns-ds', 'sns')),
-          alert_level: config.fetch('alert-level', 'warn')
-        )
+        if config['alert-level']
+          logger = AlertingLogger.new(
+            logger: raw_logger,
+            sns_datasource: ctx.get_data_source('sns', config.fetch('sns-ds', 'sns')),
+            alert_level: config.fetch('alert-level', 'warn')
+          )
+        end
 
         object_buffer = ObjectBuffer.new(
-          control_data_source: ctx.get_data_source('sql', config.fetch('ctl-postgres-ds', 'db_data')),
-          logger: alert_logger
+          control_data_source: ctx.get_data_source('sql', config.fetch('ctl-postgres-ds', 'db_ctl')),
+          logger: logger
         )
 
         url_patterns = URLPatterns.for_config(config.fetch('url_patterns'))
@@ -50,14 +53,15 @@ module Bricolage
           object_buffer: object_buffer,
           url_patterns: url_patterns,
           dispatch_interval: 60,
-          logger: alert_logger
+          logger: logger
         )
 
         Process.daemon(true) if opts.daemon?
         create_pid_file opts.pid_file_path if opts.pid_file_path
         dispatcher.event_loop
       rescue Exception => e
-        alert_logger.error e.message
+        logger.exception e
+        logger.error "dispatcher abort: pid=#{$$}"
         raise
       end
 
@@ -92,11 +96,11 @@ module Bricolage
       attr_reader :logger
 
       def event_loop
-        logger.info "dispatcher started"
+        logger.info "*** dispatcher started: pid=#{$$}"
         set_dispatch_timer
         @event_queue.handle_messages(handler: self, message_class: Event)
         @event_queue.process_async_delete_force
-        logger.info "shutdown gracefully"
+        logger.info "*** shutdown gracefully: pid=#{$$}"
       end
 
       # override
@@ -105,6 +109,7 @@ module Bricolage
         @event_queue.process_async_delete
 
         if @dispatch_requested
+          logger.info "*** dispatch requested"
           dispatch_tasks
           @dispatch_requested = false
         end
@@ -115,7 +120,13 @@ module Bricolage
         end
       end
 
+      def handle_unknown(e)
+        logger.warn "unknown event: #{e.message_body}"
+        @event_queue.delete_message_async(e)
+      end
+
       def handle_shutdown(e)
+        logger.info "*** shutdown requested"
         @event_queue.initiate_terminate
         # Delete this event immediately
         @event_queue.delete_message(e)
@@ -130,7 +141,7 @@ module Bricolage
       end
 
       def create_checkpoint
-        logger.info "*** Creating checkpoint requested ***"
+        logger.info "*** checkpoint requested"
         logger.info "Force-flushing all objects..."
         tasks = @object_buffer.flush_tasks_force
         send_tasks tasks
@@ -149,7 +160,6 @@ module Bricolage
       end
 
       def handle_dispatch(e)
-        logger.info "dispatching tasks requested"
         # Dispatching tasks may takes 10 minutes or more, it can exceeds visibility timeout.
         # To avoid this, delay dispatching until all events of current message batch are processed.
         if @dispatch_message_id == e.message_id
@@ -170,7 +180,7 @@ module Bricolage
       end
 
       def handle_flushtable(e)
-        logger.info "flushing #{e.table_name} requested"
+        logger.info "*** flushtable requested: table=#{e.table_name}"
         tasks = @object_buffer.flush_table_force(e.table_name)
         send_tasks tasks
         # Delete this event immediately
