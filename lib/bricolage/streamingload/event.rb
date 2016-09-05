@@ -12,7 +12,7 @@ module Bricolage
         when rec['eventName'] == 'dispatch' then DispatchEvent
         when rec['eventName'] == 'flushtable' then FlushTableEvent
         when rec['eventName'] == 'checkpoint' then CheckPointEvent
-        when rec['eventSource'] == 'aws:s3'
+        when !!rec['s3']
           S3ObjectEvent
         else
           raise "[FATAL] unknown SQS message record: eventSource=#{rec['eventSource']} event=#{rec['eventName']} message_id=#{msg.message_id}"
