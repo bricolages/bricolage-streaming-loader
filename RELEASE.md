@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.7.0
+
+- [CHANGE] SQS data source requires "region" attribute.
+
 ## version 0.6.2
 
 - [new] AWS access key id and secret key are now optional for SQS data sources (to allow using EC2 instance or ECS task attached IAM roles).
