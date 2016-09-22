@@ -10,7 +10,7 @@ module Bricolage
 
     declare_type 'sqs'
 
-    def initialize(region: 'ap-northeast-1', url:, access_key_id:, secret_access_key:,
+    def initialize(region: 'ap-northeast-1', url:, access_key_id: nil, secret_access_key: nil,
         visibility_timeout:, max_number_of_messages: 10, wait_time_seconds: 20, noop: false)
       @region = region
       @url = url
