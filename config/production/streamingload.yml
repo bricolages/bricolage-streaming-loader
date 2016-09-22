@@ -1,0 +1,15 @@
+#event-queue-ds: sqs_event
+#task-queue-ds: sqs_task
+#redshift-ds: db_data
+#ctl-postgres-ds: db_ctl
+#ctl-s3-ds: s3_ctl
+
+# To Enable SNS notification
+#sns-ds: sns
+#alert-level: warn
+
+url_patterns:
+  -
+    url: "s3://some-log-bucket/\\w{4}\\.\\w+?\\.\\w+?\\.(?<schema>\\w+)\\.(?<table>\\w+)/\\d{4}/\\d{2}/\\d{2}/.*\\.gz"
+    schema: "%schema"
+    table: "%table"

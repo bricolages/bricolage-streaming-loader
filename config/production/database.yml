@@ -1,0 +1,56 @@
+### Databases
+
+db_ctl:
+  type: psql
+  host: localhost
+  port: 5432
+  database: bricolage
+  username: bricolage
+  password: bricolage
+  encoding: utf8
+
+db_data: &db_data
+  type: psql
+  host: redshift.host
+  port: 5439
+  database: production
+  username: bricolage
+  pgpass: <%= user_home_relative_path '.pgpass' %>
+  encoding: utf8
+
+sql:
+  <<: *db_data
+
+### SQS
+
+sqs_event:
+  type: sqs
+  url: "https://sqs.ap-northeast-1.amazonaws.com/111111111111/bricolage-events"
+  max_number_of_messages: 10
+  visibility_timeout: 600
+  wait_time_seconds: 10
+  access_key_id: "<%= password 'aws_access_key_id' %>"
+  secret_access_key: "<%= password 'aws_secret_access_key' %>"
+
+sqs_task:
+  type: sqs
+  url: "https://sqs.ap-northeast-1.amazonaws.com/111111111111/bricolage-tasks"
+  max_number_of_messages: 1
+  visibility_timeout: 1800
+  wait_time_seconds: 10
+  access_key_id: "<%= password 'aws_access_key_id' %>"
+  secret_access_key: "<%= password 'aws_secret_access_key' %>"
+
+### S3
+
+s3_ctl: &s3_ctl
+  type: s3
+  region: "ap-northeast-1"
+  endpoint: "s3-ap-northeast-1.amazonaws.com"
+  bucket: bricolagectl.ap-northeast-1
+  prefix: development/strload
+  access_key_id: "<%= password 'aws_access_key_id' %>"
+  secret_access_key: "<%= password 'aws_secret_access_key' %>"
+
+s3:
+  <<: *s3_ctl

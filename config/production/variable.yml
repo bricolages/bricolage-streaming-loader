@@ -1,0 +1,5 @@
+defaults:
+    redshift-ds: db_data
+    ctl-ds: s3_ctl
+
+dwh_schema: dwh

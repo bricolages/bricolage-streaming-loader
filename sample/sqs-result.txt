@@ -1,0 +1,18 @@
+#<struct Aws::SQS::Types::ReceiveMessageResult
+  messages = [
+    #<struct Aws::SQS::Types::Message
+      message_id = "11112222-b37f-4281-aee2-696408c482be",
+      receipt_handle = "AQEBErp4Vv159Hvx5oXSioWu7Ov1Jj1ht423LwTTUlgLohmKh02gAMAZ7kN1J4+aLzM54BRuMatnifWPH3cBh6rtdSWlllysBVmXDRKj83VCaseKPpq+Vdw/bLZrPEYRSGPuhKsHa2DFjo67KeND4AqasZO7lOCJX+YcsbqsqAtcODlDWlVbfedPkKIGM3Scra3uY9ysGjNx/zWuJ88fCtvRpu9tgk0nG7srHAm84Mxj5ArakJnKnJMbtkD/+lvm0Vqi2YCkXonS8+BP8gK4kSTbl1uv/Gp7ZfxkjKQJBB8xQiYo7e7qKLwhbImMZtO5tqDKzIKFVfMi1G2ODF+tEj4Ce+ryMRGA50GhON2ETCyofsl1T7Wdr61IEOV0NFlonGTWFf4q/1r3OPhFAchp+tYnyA==",
+      md5_of_body = "00006bf43abdff178ca0ffa96205aaaa",
+      body = "{\"Records\":[{\"eventVersion\":\"2.0\",\"eventSource\":\"aws:s3\",\"awsRegion\":\"ap-northeast-1\",\"eventTime\":\"2016-02-13T11:40:07.268Z\",\"eventName\":\"ObjectCreated:Put\",\"userIdentity\":{\"principalId\":\"AWS:AAAAJKS3A4VEF45XCAAAA\"},\"requestParameters\":{\"sourceIPAddress\":\"111.222.111.90\"},\"responseElements\":{\"x-amz-request-id\":\"10AAAA31A1EDCCCC\",\"x-amz-id-2\":\"YT+U/PxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxzfFGPjqP5AQg=\"},\"s3\":{\"s3SchemaVersion\":\"1.0\",\"configurationId\":\"LogStreamDev\",\"bucket\":{\"name\":\"redshift-copy-buffer\",\"ownerIdentity\":{\"principalId\":\"AAAAFIDWR40000\"},\"arn\":\"arn:aws:s3:::redshift-copy-buffer\"},\"object\":{\"key\":\"development/logs/schema.table/20160125_0000_0_2d0b43ad-0db9-4655-bd98-b7464b123763.gz\",\"size\":1238953,\"eTag\":\"aaaa196c3935f4957c7bb645f9780000\",\"sequencer\":\"0000BF161697C1AAAA\"}}}]}",
+      attributes = {
+        "SenderId" => "FACE0VEO02BJMF37H2JKW",
+        "ApproximateFirstReceiveTimestamp" => "1455364193429",
+        "ApproximateReceiveCount" => "1",
+        "SentTimestamp" => "1455363607341"
+      },
+      md5_of_message_attributes = nil,
+      message_attributes = {}
+    >
+  ]
+>
