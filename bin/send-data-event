@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby
+
+require 'bricolage/commandlineapplication'
+
+no_dispatch = false
+app = Bricolage::CommandLineApplication.define {|opts|
+  opts.data_source_option('--queue-ds', 'Target queue data soure.', short: '-D', kind: 'sqs')
+  opts.on('--no-dispatch', 'Turn off dispatch flag.') {
+    no_dispatch = true
+  }
+}
+queue = app.data_source('--queue-ds')
+
+ARGF.each do |line|
+  url = line.strip
+  bucket, key = url.sub(%r<s3://>, '').split('/', 2)
+  $stderr.puts "PUT bucket=#{bucket} key=#{key}"
+  queue.send_event(
+    "ObjectCreated:Put",
+    eventVersion: "2.0",
+    awsRegion: queue.region,
+    s3: {
+      s3SchemaVersion: "1.0",
+      configurationId: "LogStreamDev",
+      bucket: {
+        name: bucket,
+        arn: "arn:aws:s3:::#{bucket}"
+      },
+      object: {
+        key: key,
+        size: 1
+      }
+    },
+    noDispatch: no_dispatch
+  )
+end

@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+
+require 'bricolage/commandlineapplication'
+
+app = Bricolage::CommandLineApplication.define {|opts|
+  opts.data_source_option('--queue-ds', 'Target queue data soure.', short: '-D', kind: 'sqs')
+}
+queue = app.data_source('--queue-ds')
+
+ARGF.each do |line|
+  task_id = line.strip
+  queue.send_event('streaming_load_v3', taskId: task_id)
+end
