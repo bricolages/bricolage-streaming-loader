@@ -1,5 +1,11 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.6.2
+
+- [new] AWS access key id and secret key are now optional for SQS data sources (to allow using EC2 instance or ECS task attached IAM roles).
+- [new] New utility commands send-data-event, send-shutdown, send-checkpoint, send-load-task.
+- Adds sample config files.
+
 ## version 0.6.1
 
 - [fix] dispatcher: Default ctl data source was wrong.
