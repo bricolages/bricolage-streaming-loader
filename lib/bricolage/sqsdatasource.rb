@@ -170,6 +170,17 @@ module Bricolage
       )
     end
 
+    def send_object(obj)
+      send_message(ObjectMessage.new(obj))
+    end
+
+    def send_event(name, source: SQSMessage::SQS_EVENT_SOURCE, time: Time.now, **attrs)
+      attrs['eventName'] = name
+      attrs['eventSource'] = source
+      attrs['eventTime'] = time.iso8601
+      send_object(attrs)
+    end
+
     def delete_message(msg)
       client.delete_message(
         queue_url: @url,
@@ -438,5 +449,19 @@ module Bricolage
     attr_reader :message_body
 
   end   # class UnknownSQSMessage
+
+
+  # library private
+  class ObjectMessage
+
+    def initialize(body, delay_seconds: 0)
+      @body = body
+      @delay_seconds = delay_seconds
+    end
+
+    attr_reader :body
+    attr_reader :delay_seconds
+
+  end
 
 end   # module Bricolage
