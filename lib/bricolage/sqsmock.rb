@@ -6,6 +6,7 @@ module Bricolage
 
   def SQSDataSource.new_mock(**args)
     SQSDataSource.new(
+      region: 'ap-northeast-1',
       url: 'http://sqs/000000000000/queue-name',
       access_key_id: 'access_key_id_1',
       secret_access_key: 'secret_access_key_1',
