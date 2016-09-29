@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.7.1
+
+- fix utilities
+
 ## version 0.7.0
 
 - [CHANGE] SQS data source requires "region" attribute.
