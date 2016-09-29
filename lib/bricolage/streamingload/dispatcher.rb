@@ -27,7 +27,7 @@ module Bricolage
         end
         config_path, * = opts.rest_arguments
         config = YAML.load(File.read(config_path))
-        log = opts.log_file_path ? new_logger(opts.log_file_path, config) : nil
+        log = opts.log_file_path ? new_logger(File.expand_path(opts.log_file_path), config) : nil
         ctx = Context.for_application('.', environment: opts.environment, logger: log)
         logger = raw_logger = ctx.logger
         event_queue = ctx.get_data_source('sqs', config.fetch('event-queue-ds', 'sqs_event'))
@@ -58,6 +58,7 @@ module Bricolage
 
         Process.daemon(true) if opts.daemon?
         create_pid_file opts.pid_file_path if opts.pid_file_path
+        Dir.chdir '/'
         dispatcher.event_loop
       rescue Exception => e
         logger.exception e
