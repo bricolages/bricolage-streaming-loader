@@ -49,11 +49,17 @@ module Bricolage
       def put
         @logger.info "s3: put: #{url}"
         @ds.object(name).put(body: content) unless @noop
+      rescue Aws::S3::Errors::ServiceError => ex
+        @logger.exception ex
+        raise S3Exception.wrap(ex)
       end
 
       def delete
         @logger.info "s3: delete: #{url}"
         @ds.object(name).delete unless @noop
+      rescue Aws::S3::Errors::ServiceError => ex
+        @logger.exception ex
+        raise S3Exception.wrap(ex)
       end
 
       def create_temporary
