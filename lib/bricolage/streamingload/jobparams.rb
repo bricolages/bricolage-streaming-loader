@@ -6,67 +6,42 @@ module Bricolage
 
   module StreamingLoad
 
-    class LoaderParams
+    class JobParams
 
-      def LoaderParams.load(ctx, task)
-        job = load_job(ctx, task)
-        schema = resolve_schema(ctx, task.schema)
-        job.provide_default 'dest-table', "#{schema}.#{task.table}"
+      def JobParams.load(ctx, job_class, schema, table)
+        job = load_bricolage_job(ctx, job_class, schema, table)
+        schema = resolve_schema(ctx, schema)
+        job.provide_default 'dest-table', "#{schema}.#{table}"
         #job.provide_sql_file_by_job_id   # FIXME: provide only when exist
         job.compile
-        new(task, job)
+        new(job)
       end
 
-      def LoaderParams.load_job(ctx, task)
-        if job_file = find_job_file(ctx, task.schema, task.table)
+      def JobParams.load_bricolage_job(ctx, job_class, schema, table)
+        if job_file = find_job_file(ctx, schema, table)
           ctx.logger.debug "using .job file: #{job_file}"
-          Job.load_file(job_file, ctx.subsystem(task.schema))
+          Bricolage::Job.load_file(job_file, ctx.subsystem(schema))
         else
           ctx.logger.debug "using default job parameters (no .job file)"
-          Job.instantiate(task.table, 'streaming_load_v3', ctx).tap {|job|
+          Bricolage::Job.instantiate(table, job_class, ctx).tap {|job|
             job.bind_parameters({})
           }
         end
       end
 
-      def LoaderParams.find_job_file(ctx, schema, table)
+      def JobParams.find_job_file(ctx, schema, table)
         paths = Dir.glob("#{ctx.home_path}/#{schema}/#{table}.*")
         paths.select {|path| File.extname(path) == '.job' }.sort.first
       end
 
-      def LoaderParams.resolve_schema(ctx, schema)
+      def JobParams.resolve_schema(ctx, schema)
         ctx.global_variables["#{schema}_schema"] || schema
       end
       private_class_method :resolve_schema
 
-      def initialize(task, job)
-        @task = task
+      def initialize(job)
         @job = job
         @params = job.params
-      end
-
-      def task_id
-        @task.id
-      end
-
-      def task_id
-        @task.id
-      end
-
-      def schema
-        @task.schema
-      end
-
-      def table
-        @task.table
-      end
-
-      def force?
-        @task.force?
-      end
-
-      def object_urls
-        @task.object_urls
       end
 
       def ds
@@ -101,7 +76,7 @@ module Bricolage
     end
 
 
-    class LoaderJob < RubyJobClass
+    class StreamingLoadV3Job < RubyJobClass
 
       job_class_id 'streaming_load_v3'
 

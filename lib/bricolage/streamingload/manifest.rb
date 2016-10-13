@@ -4,7 +4,7 @@ module Bricolage
 
     class ManifestFile
 
-      def ManifestFile.create(ds, job_id:, object_urls:, logger:, noop: false, &block)
+      def ManifestFile.create(ds:, job_id:, object_urls:, logger:, noop: false, &block)
         manifest = new(ds, job_id, object_urls, logger: logger, noop: noop)
         if block
           manifest.create_temporary(&block)

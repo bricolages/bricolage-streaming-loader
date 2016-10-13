@@ -87,9 +87,9 @@ module Bricolage
 
         # Object Buffer
         assert_equal [], unassigned_objects(ctl_ds)
-        task = ctl_ds.open {|conn| LoadTask.load(conn, task_id) }
-        assert_equal 'testschema', task.schema
-        assert_equal 'desttable', task.table
+        task = Job::ControlConnection.open(ctl_ds) {|ctl| ctl.load_task(task_id) }
+        assert_equal 'testschema', task.schema_name
+        assert_equal 'desttable', task.table_name
         assert_equal 10, task.object_urls.size
       end
 
@@ -180,9 +180,9 @@ module Bricolage
 
         # Object Buffer
         assert_equal [], unassigned_table_objects(ctl_ds, 'testschema.bbb')
-        task = ctl_ds.open {|conn| LoadTask.load(conn, task_id) }
-        assert_equal 'testschema', task.schema
-        assert_equal 'bbb', task.table
+        task = Job::ControlConnection.open(ctl_ds) {|ctl| ctl.load_task(task_id) }
+        assert_equal 'testschema', task.schema_name
+        assert_equal 'bbb', task.table_name
         assert_equal 2, task.object_urls.size
       end
 

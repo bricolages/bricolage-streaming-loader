@@ -1,8 +1,5 @@
 require 'bricolage/streamingload/task'
-require 'bricolage/streamingload/loaderparams'
 require 'bricolage/sqlutils'
-require 'json'
-require 'securerandom'
 require 'forwardable'
 
 module Bricolage
