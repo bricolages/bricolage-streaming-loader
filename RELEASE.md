@@ -1,5 +1,10 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.8.0
+
+- [CHANGE] Loader retries failed load tasks automatically.  Streaming loader does NOT delete a task from the queue on job failures.
+- [enhancement] Rewrites loader to get better error handling (ensure to write log record in the wider range of errornous situations).
+
 ## version 0.7.1
 
 - fix utilities
