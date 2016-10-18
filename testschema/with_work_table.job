@@ -1,0 +1,4 @@
+class: streaming_load_v3
+dest-table: $testschema_schema.with_work_table
+work-table: $testschema_schema.with_work_table_wk
+sql-file: with_work_table.sql

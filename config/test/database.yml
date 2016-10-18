@@ -1,0 +1,17 @@
+dwhctl:
+  type: psql
+  host: localhost
+  port: 5432
+  database: bricolage_test
+  username: bricolage
+  password: bricolage
+  encoding: utf8
+
+db_data_mock:
+  type: psql_mock
+  fail_pattern: sql_fails
+  error_pattern: job_error
+  exception_pattern: unexpected_error
+
+s3_ctl_mock:
+  type: s3_mock

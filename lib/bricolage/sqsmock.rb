@@ -1,5 +1,4 @@
 require 'bricolage/sqsdatasource'
-require 'bricolage/nulllogger'
 require 'json'
 
 module Bricolage

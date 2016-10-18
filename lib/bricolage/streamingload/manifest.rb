@@ -4,7 +4,7 @@ module Bricolage
 
     class ManifestFile
 
-      def ManifestFile.create(ds, job_id:, object_urls:, logger:, noop: false, &block)
+      def ManifestFile.create(ds:, job_id:, object_urls:, logger:, noop: false, &block)
         manifest = new(ds, job_id, object_urls, logger: logger, noop: noop)
         if block
           manifest.create_temporary(&block)
@@ -49,11 +49,17 @@ module Bricolage
       def put
         @logger.info "s3: put: #{url}"
         @ds.object(name).put(body: content) unless @noop
+      rescue Aws::S3::Errors::ServiceError => ex
+        @logger.exception ex
+        raise S3Exception.wrap(ex)
       end
 
       def delete
         @logger.info "s3: delete: #{url}"
         @ds.object(name).delete unless @noop
+      rescue Aws::S3::Errors::ServiceError => ex
+        @logger.exception ex
+        raise S3Exception.wrap(ex)
       end
 
       def create_temporary

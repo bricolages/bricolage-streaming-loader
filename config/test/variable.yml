@@ -1,0 +1,5 @@
+defaults:
+    redshift-ds: db_data_mock
+    ctl-ds: s3_ctl_mock
+
+testschema_schema: testschema
