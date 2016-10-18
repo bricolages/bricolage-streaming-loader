@@ -3,7 +3,7 @@ PATH
   specs:
     bricolage-streamingload (0.7.1)
       aws-sdk (~> 2.6.2)
-      bricolage (~> 5.18.1)
+      bricolage (~> 5.19.0)
       pg (~> 0.18.0)
 
 GEM
@@ -15,7 +15,7 @@ GEM
       jmespath (~> 1.0)
     aws-sdk-resources (2.6.7)
       aws-sdk-core (= 2.6.7)
-    bricolage (5.18.1)
+    bricolage (5.19.0)
       aws-sdk (~> 2)
       mysql2
       pg (~> 0.18.0)
