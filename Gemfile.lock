@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    bricolage-streamingload (0.8.0)
+    bricolage-streamingload (0.8.1)
       aws-sdk (~> 2.6.2)
       bricolage (~> 5.19.0)
       pg (~> 0.18.0)
@@ -9,12 +9,12 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
-    aws-sdk (2.6.7)
-      aws-sdk-resources (= 2.6.7)
-    aws-sdk-core (2.6.7)
+    aws-sdk (2.6.10)
+      aws-sdk-resources (= 2.6.10)
+    aws-sdk-core (2.6.10)
       jmespath (~> 1.0)
-    aws-sdk-resources (2.6.7)
-      aws-sdk-core (= 2.6.7)
+    aws-sdk-resources (2.6.10)
+      aws-sdk-core (= 2.6.10)
     bricolage (5.19.0)
       aws-sdk (~> 2)
       mysql2
@@ -53,10 +53,10 @@ GEM
       td-logger (~> 0.3.21)
       yajl-ruby (~> 1.1)
       zip-zip (~> 0.3)
-    td-client (0.8.83)
-      httpclient (~> 2.7)
+    td-client (0.8.84)
+      httpclient (>= 2.7)
       json (>= 1.7.6)
-      msgpack (>= 0.4.4, < 0.8.0, != 0.5.3, != 0.5.2, != 0.5.1, != 0.5.0)
+      msgpack (>= 0.5.6, < 2)
     td-logger (0.3.25)
       fluent-logger (~> 0.5.0)
       msgpack (>= 0.4.4, < 0.8.0, != 0.5.3, != 0.5.2, != 0.5.1, != 0.5.0)

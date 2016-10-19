@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.8.1
+
+- [fix] tmp: Do not retry on data connection failure.
+
 ## version 0.8.0
 
 - [CHANGE] Loader retries failed load tasks automatically.  Streaming loader does NOT delete a task from the queue on job failures.
