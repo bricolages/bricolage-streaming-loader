@@ -55,7 +55,9 @@ module Bricolage
         return false
       rescue DataConnectionFailed
         wait_for_connection('data', @data_ds) unless fail_fast
-        return false
+        # FIXME: tmp: We don't know the transaction was succeeded or not in the Redshift, auto-retry is too dangerous.
+        #return false
+        return true
       rescue JobFailure
         return false
       rescue JobError
@@ -96,6 +98,15 @@ module Bricolage
           }
         rescue ControlConnectionFailed
           raise
+
+        # FIXME: tmp: should be a failure, not an error.
+        rescue DataConnectionFailed => ex
+          @logger.error ex.message
+          ctl.open {
+            ctl.abort_job job_id, 'error', ex.message.lines.first.strip
+          }
+          raise
+
         rescue JobFailure => ex
           @logger.error ex.message
           ctl.open {
