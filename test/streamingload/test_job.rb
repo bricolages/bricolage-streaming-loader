@@ -564,7 +564,27 @@ module Bricolage
         end
       end
 
-    end
+      test "TaskInfo#failure_count" do
+        test_data = [
+          [%w[], 0],
+          [%w[success], 0],
+          [%w[failure], 1],
+          [%w[error], 1],
+          [%w[failure failure], 2],
+          [%w[failure error], 2],
+          [%w[failure success], 0],
+          [%w[success success], 0],
+          [%w[failure success failure], 1],
+          [%w[failure success failure success failure failure], 2]
+        ]
+        c = Job::ControlConnection
+        test_data.each do |status_list, expected_count|
+          task = c::TaskInfo.new(nil,nil,nil,nil,nil,nil, status_list.map {|st| c::JobInfo.new(nil, st) })
+          assert_equal expected_count, task.failure_count
+        end
+      end
 
-  end
-end
+    end   # class TestJob
+
+  end   # module StreamingLoad
+end   # module Bricolage
