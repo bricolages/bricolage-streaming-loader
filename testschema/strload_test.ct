@@ -1,0 +1,11 @@
+--dest-table: $test_schema.strload_test
+
+create table $dest_table
+( jst_time timestamp encode delta
+, full_controller varchar(128) encode lzo
+, action varchar(128) encode lzo
+, user_id integer encode lzo
+, unique_id varchar(80) encode lzo
+)
+sortkey (jst_time)
+;

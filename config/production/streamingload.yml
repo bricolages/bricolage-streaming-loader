@@ -1,8 +1,11 @@
 #event-queue-ds: sqs_event
 #task-queue-ds: sqs_task
-#redshift-ds: db_data
+
 #ctl-postgres-ds: db_ctl
 #ctl-s3-ds: s3_ctl
+
+#redshift-ds: db_data
+#log-table: strload_load_logs
 
 # To Enable SNS notification
 #sns-ds: sns
