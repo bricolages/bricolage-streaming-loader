@@ -29,6 +29,7 @@ module Bricolage
         ctx = Context.for_application(opts.working_dir, environment: opts.environment, logger: logger)
 
         ctl_ds = ctx.get_data_source('sql', config.fetch('ctl-postgres-ds', 'db_ctl'))
+        data_ds = ctx.get_data_source('sql', config.fetch('redshift-ds', 'db_data'))
         task_queue = ctx.get_data_source('sqs', config.fetch('task-queue-ds', 'sqs_task'))
         log_table = config.fetch('log-table', 'strload_load_logs')
         service_logger =
@@ -41,6 +42,7 @@ module Bricolage
         task_handler = new(
           context: ctx,
           ctl_ds: ctl_ds,
+          data_ds: data_ds,
           log_table: log_table,
           task_queue: task_queue,
           working_dir: opts.working_dir,
@@ -92,9 +94,10 @@ module Bricolage
         # ignore
       end
 
-      def initialize(context:, ctl_ds:, log_table:, task_queue:, working_dir:, logger:, job_class: Job)
+      def initialize(context:, ctl_ds:, data_ds:, log_table:, task_queue:, working_dir:, logger:, job_class: Job)
         @ctx = context
         @ctl_ds = ctl_ds
+        @data_ds = data_ds
         @log_table = log_table
         @task_queue = task_queue
         @working_dir = working_dir
@@ -132,7 +135,7 @@ module Bricolage
       end
 
       def new_job(task_id, force)
-        @job_class.new(context: @ctx, ctl_ds: @ctl_ds, log_table: @log_table, task_id: task_id, force: force, logger: @logger)
+        @job_class.new(context: @ctx, ctl_ds: @ctl_ds, data_ds: data_ds, log_table: @log_table, task_id: task_id, force: force, logger: @logger)
       end
 
       def job_class

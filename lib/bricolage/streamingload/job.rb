@@ -18,9 +18,10 @@ module Bricolage
 
     class Job
 
-      def initialize(context:, ctl_ds:, log_table: 'strload_load_logs', task_id:, force: false, logger:)
+      def initialize(context:, ctl_ds:, data_ds:, log_table: 'strload_load_logs', task_id:, force: false, logger:)
         @context = context
         @ctl_ds = ctl_ds
+        @data_ds = data_ds
         @log_table = log_table
         @task_id = task_id
         @force = force
@@ -28,7 +29,6 @@ module Bricolage
 
         @task = nil
         @job_id = nil
-        @data_ds = nil
         @manifest = nil
       end
 
@@ -57,9 +57,7 @@ module Bricolage
       rescue DataConnectionFailed => ex
         @logger.error ex.message
         wait_for_connection('data', @data_ds) unless fail_fast
-        # FIXME: tmp: We don't know the transaction was succeeded or not in the Redshift, auto-retry is too dangerous.
-        #return false
-        return true
+        return false
       rescue JobFailure => ex
         @logger.error ex.message
         return false
@@ -87,6 +85,16 @@ module Bricolage
             raise JobDefered, "defered: task_id=#{@task_id}"
           end
 
+          if @task.unknown_state?
+            true_status = DataConnection.open(@data_ds, @logger) {|data|
+              data.get_job_status(@log_table, @task.last_job_id)
+            }
+            @logger.info "fixiating unknown job status: job_id=#{@task.last_job_id}, status=(unknown->#{true_status})"
+            @task.fix_last_job_status true_status
+            ctl.fix_job_status @task.last_job_id, true_status
+            @logger.info "job status fixed."
+          end
+
           @job_id = ctl.begin_job(@task_id, @process_id, @force)
           unless @job_id
             @logger.warn "task is already succeeded and not forced; discard task: task_id=#{@task_id}"
@@ -102,17 +110,14 @@ module Bricolage
           }
         rescue ControlConnectionFailed
           raise
-
-        # FIXME: tmp: should be a failure, not an error.
         rescue DataConnectionFailed => ex
           ctl.open {
-            ctl.abort_job job_id, 'error', ex.message.lines.first.strip
+            ctl.abort_job job_id, 'unknown', ex.message.lines.first.strip
           }
           raise
-
         rescue JobFailure => ex
           ctl.open {
-            fail_count = ctl.fail_count(@task_id)
+            fail_count = @task.failure_count
             final_retry = (fail_count >= MAX_RETRY)
             retry_msg = (fail_count > 0) ? "(retry\##{fail_count}#{final_retry ? ' FINAL' : ''}) " : ''
             ctl.abort_job job_id, 'failure', retry_msg + ex.message.lines.first.strip
@@ -193,6 +198,11 @@ module Bricolage
           raise DataConnectionFailed, "data connection failed: #{ex.message}"
         end
 
+        def get_job_status(log_table, job_id)
+          count = @connection.query_value("select count(*) from #{log_table} where job_id = #{job_id}")
+          count.to_i > 0 ? 'success' : 'failure'
+        end
+
         def load_with_work_table(work_table, manifest, options, sql_source, log_table, job_id)
           @connection.transaction {|txn|
             # NOTE: This transaction ends with truncation, this DELETE does nothing
@@ -255,7 +265,32 @@ module Bricolage
           raise ControlConnectionFailed, "control connection failed: #{ex.message}"
         end
 
-        TaskInfo = Struct.new(:task_id, :task_class, :schema_name, :table_name, :disabled, :object_urls)
+        TaskInfo = Struct.new(:task_id, :task_class, :schema_name, :table_name, :disabled, :object_urls, :jobs)
+        class TaskInfo
+          def unknown_state?
+            return false if jobs.empty?
+            jobs.last.status == 'unknown'
+          end
+
+          def last_job_id
+            return nil if jobs.empty?
+            jobs.last.job_id
+          end
+
+          def fix_last_job_status(st)
+            jobs.last.status = st unless jobs.empty?
+          end
+
+          def failure_count
+            @failure_count ||= begin
+              statuses = jobs.map(&:status)
+              statuses.delete('duplicated')
+              last_succ = statuses.rindex('success')
+              statuses[0..last_succ] = [] if last_succ
+              statuses.size
+            end
+          end
+        end
 
         def load_task(task_id)
           rec = @connection.query_row(<<-EndSQL) or raise JobError, "no such task: #{task_id}"
@@ -277,9 +312,28 @@ module Bricolage
             rec['schema_name'],
             rec['table_name'],
             (rec['disabled'] != 'f'),
-            load_object_urls(task_id)
+            load_object_urls(task_id),
+            load_jobs(task_id)
           )
         end
+
+        def load_jobs(task_id)
+          records = @connection.query_rows(<<-EndSQL)
+            select
+                job_id
+                , status
+            from
+                strload_jobs
+            where
+                task_id = #{task_id}
+            order by
+                start_time
+            ;
+          EndSQL
+          records.map {|rec| JobInfo.new(rec['job_id'].to_i, rec['status']) }
+        end
+
+        JobInfo = Struct.new(:job_id, :status, :start_time)
 
         def load_object_urls(task_id)
           urls = @connection.query_values(<<-EndSQL)
@@ -294,6 +348,20 @@ module Bricolage
             ;
           EndSQL
           urls
+        end
+
+        def fix_job_status(job_id, status)
+          @connection.update(<<-EndSQL)
+            update
+                strload_jobs
+            set
+                status = #{s status}
+                , message = 'status fixed: ' || message
+            where
+                job_id = #{job_id}
+                and status = 'unknown'
+            ;
+          EndSQL
         end
 
         def begin_job(task_id, process_id, force)
@@ -318,22 +386,6 @@ module Bricolage
             ;
           EndSQL
           return job_id ? job_id.to_i : nil
-        end
-
-        def fail_count(task_id)
-          statuses = @connection.query_values(<<-EndSQL)
-            select
-                j.status
-            from
-                strload_tasks t
-                inner join strload_jobs j using (task_id)
-            where
-                t.task_id = #{task_id}
-            order by
-                j.job_id desc
-          EndSQL
-          statuses.shift if statuses.first == 'running'   # current job
-          statuses.take_while {|st| %w[failure error].include?(st) }.size
         end
 
         def commit_job(job_id, message = nil)
