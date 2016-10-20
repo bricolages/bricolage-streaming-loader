@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.9.0
+
+- [new] Introduces Redshift-side load log table (strload_load_logs) for load duplication checking.
+
 ## version 0.8.1
 
 - [fix] tmp: Do not retry on data connection failure.
