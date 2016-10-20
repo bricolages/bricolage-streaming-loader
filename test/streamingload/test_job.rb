@@ -27,8 +27,13 @@ module Bricolage
           job = Job.new(context: ctx, ctl_ds: ctl_ds, task_id: 1, force: false, logger: ctx.logger)
           job.execute_task
 
-          copy_stmt = "copy testschema.desttable from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;"
-          assert_equal [copy_stmt], job.data_ds.sql_list
+          assert_equal [
+            "begin transaction;",
+            "copy testschema.desttable from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
+            "insert into strload_load_logs (job_id, finish_time) values (#{job.job_id}, current_timestamp)",
+            "commit;"
+          ], job.data_ds.sql_list
+
           job_row = db.query_row("select * from strload_jobs where job_id = #{job.job_id}")
           assert_equal 1, job_row['task_id'].to_i
           assert_equal job.process_id, job_row['process_id']
@@ -48,11 +53,14 @@ module Bricolage
           job = Job.new(context: ctx, ctl_ds: ctl_ds, task_id: 11, force: false, logger: ctx.logger)
           job.execute_task
 
-          assert_equal 'begin transaction;', job.data_ds.sql_list[0]
-          assert_equal 'delete from testschema.with_work_table_wk', job.data_ds.sql_list[1]
-          assert_equal "copy testschema.with_work_table_wk from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;", job.data_ds.sql_list[2]
-          assert_equal "insert into testschema.with_work_table select * from testschema.with_work_table_wk;\n", job.data_ds.sql_list[3]
-          assert_equal 'truncate testschema.with_work_table_wk;', job.data_ds.sql_list[4]
+          assert_equal [
+            "begin transaction;",
+            "delete from testschema.with_work_table_wk",
+            "copy testschema.with_work_table_wk from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
+            "insert into testschema.with_work_table select * from testschema.with_work_table_wk;\n",
+            "insert into strload_load_logs (job_id, finish_time) values (#{job.job_id}, current_timestamp)",
+            "truncate testschema.with_work_table_wk;"
+          ], job.data_ds.sql_list
 
           job_row = db.query_row("select * from strload_jobs where job_id = #{job.job_id}")
           assert_equal 11, job_row['task_id'].to_i
@@ -103,8 +111,12 @@ module Bricolage
           job = Job.new(context: ctx, ctl_ds: ctl_ds, task_id: 11, force: true, logger: ctx.logger)
           job.execute_task
 
-          copy_stmt = "copy testschema.desttable from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;"
-          assert_equal [copy_stmt], job.data_ds.sql_list
+          assert_equal [
+            "begin transaction;",
+            "copy testschema.desttable from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
+            "insert into strload_load_logs (job_id, finish_time) values (#{job.job_id}, current_timestamp)",
+            "commit;"
+          ], job.data_ds.sql_list
 
           job_row = db.query_row("select * from strload_jobs where job_id = #{job.job_id}")
           assert_equal 11, job_row['task_id'].to_i
@@ -127,8 +139,11 @@ module Bricolage
           assert_raise(JobFailure) {
             job.execute_task
           }
-          copy_stmt = "copy testschema.sql_fails from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;"
-          assert_equal [copy_stmt], job.data_ds.sql_list
+          assert_equal [
+            "begin transaction;",
+            "copy testschema.sql_fails from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
+            "abort;"
+          ], job.data_ds.sql_list
 
           job_row = db.query_row("select * from strload_jobs where job_id = #{job.job_id}")
           assert_equal 11, job_row['task_id'].to_i
@@ -153,8 +168,11 @@ module Bricolage
           assert_raise(JobFailure) {
             job.execute_task
           }
-          copy_stmt = "copy testschema.sql_fails from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;"
-          assert_equal [copy_stmt], job.data_ds.sql_list
+          assert_equal [
+            "begin transaction;",
+            "copy testschema.sql_fails from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
+            "abort;"
+          ], job.data_ds.sql_list
 
           job_row = db.query_row("select * from strload_jobs where job_id = #{job.job_id}")
           assert_equal 11, job_row['task_id'].to_i
@@ -183,8 +201,12 @@ module Bricolage
           assert_raise(JobCancelled) {
             job.execute_task
           }
-          copy_stmt = "copy testschema.sql_fails from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;"
-          assert_equal [copy_stmt], job.data_ds.sql_list
+          assert_equal [
+            "begin transaction;",
+            "copy testschema.sql_fails from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
+            "abort;"
+          ], job.data_ds.sql_list
+
           job_row = db.query_row("select * from strload_jobs where job_id = #{job.job_id}")
           assert_equal 11, job_row['task_id'].to_i
           assert_equal job.process_id, job_row['process_id']
@@ -206,7 +228,12 @@ module Bricolage
           assert_raise(JobError) {
             job.execute_task
           }
-          assert_equal 1, job.data_ds.sql_list.size
+          assert_equal [
+            "begin transaction;",
+            "copy testschema.job_error from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
+            "abort;"
+          ], job.data_ds.sql_list
+
           job_row = db.query_row("select * from strload_jobs where job_id = #{job.job_id}")
           assert_equal 11, job_row['task_id'].to_i
           assert_equal job.process_id, job_row['process_id']
@@ -227,7 +254,12 @@ module Bricolage
           assert_raise(JobError) {
             job.execute_task
           }
-          assert_equal 1, job.data_ds.sql_list.size
+          assert_equal [
+            "begin transaction;",
+            "copy testschema.unexpected_error from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
+            "abort;"
+          ], job.data_ds.sql_list
+
           job_row = db.query_row("select * from strload_jobs where job_id = #{job.job_id}")
           assert_equal 11, job_row['task_id'].to_i
           assert_equal job.process_id, job_row['process_id']
@@ -379,21 +411,39 @@ module Bricolage
 
           def transaction
             @ds.issue_sql "begin transaction;"
-            yield Transaction.new(@ds)
+            txn = Transaction.new(@ds)
+            yield txn
+          rescue
+            txn.abort unless txn.committed?
+            raise
+          ensure
+            txn.commit unless txn.committed?
           end
         end
 
         class Transaction
           def initialize(ds)
             @ds = ds
+            @commit = false
+          end
+
+          def committed?
+            @commit
           end
 
           def commit
             @ds.issue_sql "commit;"
+            @commit = true
+          end
+
+          def abort
+            @ds.issue_sql "abort;"
+            @commit = true
           end
 
           def truncate_and_commit(table)
             @ds.issue_sql "truncate #{table};"
+            @commit = true
           end
         end
       end

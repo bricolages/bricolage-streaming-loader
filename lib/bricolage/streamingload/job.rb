@@ -18,9 +18,10 @@ module Bricolage
 
     class Job
 
-      def initialize(context:, ctl_ds:, task_id:, force: false, logger:)
+      def initialize(context:, ctl_ds:, log_table: 'strload_load_logs', task_id:, force: false, logger:)
         @context = context
         @ctl_ds = ctl_ds
+        @log_table = log_table
         @task_id = task_id
         @force = force
         @logger = logger
@@ -53,14 +54,17 @@ module Bricolage
         @logger.error ex.message
         wait_for_connection('ctl', @ctl_ds) unless fail_fast
         return false
-      rescue DataConnectionFailed
+      rescue DataConnectionFailed => ex
+        @logger.error ex.message
         wait_for_connection('data', @data_ds) unless fail_fast
         # FIXME: tmp: We don't know the transaction was succeeded or not in the Redshift, auto-retry is too dangerous.
         #return false
         return true
-      rescue JobFailure
+      rescue JobFailure => ex
+        @logger.error ex.message
         return false
-      rescue JobError
+      rescue JobError => ex
+        @logger.error ex.message
         return true
       rescue Exception => ex
         @logger.exception ex
@@ -101,14 +105,12 @@ module Bricolage
 
         # FIXME: tmp: should be a failure, not an error.
         rescue DataConnectionFailed => ex
-          @logger.error ex.message
           ctl.open {
             ctl.abort_job job_id, 'error', ex.message.lines.first.strip
           }
           raise
 
         rescue JobFailure => ex
-          @logger.error ex.message
           ctl.open {
             fail_count = ctl.fail_count(@task_id)
             final_retry = (fail_count >= MAX_RETRY)
@@ -118,7 +120,6 @@ module Bricolage
           }
           raise
         rescue JobError => ex
-          @logger.error ex.message
           ctl.open {
             ctl.abort_job job_id, 'error', ex.message.lines.first.strip
           }
@@ -138,9 +139,9 @@ module Bricolage
         @manifest = ManifestFile.create(ds: params.ctl_bucket, job_id: job_id, object_urls: task.object_urls, logger: @logger)
         DataConnection.open(params.ds, @logger) {|data|
           if params.enable_work_table?
-            data.load_with_work_table params.work_table, @manifest, params.load_options_string, params.sql_source
+            data.load_with_work_table params.work_table, @manifest, params.load_options_string, params.sql_source, @log_table, job_id
           else
-            data.load_objects params.dest_table, @manifest, params.load_options_string
+            data.load_objects params.dest_table, @manifest, params.load_options_string, @log_table, job_id
           end
         }
       end
@@ -192,18 +193,26 @@ module Bricolage
           raise DataConnectionFailed, "data connection failed: #{ex.message}"
         end
 
-        def load_with_work_table(work_table, manifest, options, sql_source)
+        def load_with_work_table(work_table, manifest, options, sql_source, log_table, job_id)
           @connection.transaction {|txn|
             # NOTE: This transaction ends with truncation, this DELETE does nothing
             # from the second time.  So don't worry about DELETE cost here.
             @connection.execute("delete from #{work_table}")
-            load_objects work_table, manifest, options
+            execute_copy work_table, manifest, options
             @connection.execute sql_source
+            write_load_log log_table, job_id
             txn.truncate_and_commit work_table
           }
         end
 
-        def load_objects(dest_table, manifest, options)
+        def load_objects(dest_table, manifest, options, log_table, job_id)
+          @connection.transaction {|txn|
+            execute_copy dest_table, manifest, options
+            write_load_log log_table, job_id
+          }
+        end
+
+        def execute_copy(dest_table, manifest, options)
           @connection.execute(<<-EndSQL.strip.gsub(/\s+/, ' '))
               copy #{dest_table}
               from #{s manifest.url}
@@ -215,6 +224,10 @@ module Bricolage
               ;
           EndSQL
           @logger.info "load succeeded: #{manifest.url}"
+        end
+
+        def write_load_log(log_table, job_id)
+          @connection.execute("insert into #{log_table} (job_id, finish_time) values (#{job_id}, current_timestamp)")
         end
 
       end   # class DataConnection

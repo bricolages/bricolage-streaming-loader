@@ -1,0 +1,12 @@
+--dest-table: bricolage.strload_load_logs
+
+/*
+    Redshift-side log table
+*/
+create table $dest_table
+( job_id bigint encode raw
+, finish_time timestamp encode delta
+)
+distkey (job_id)
+sortkey (job_id)
+;

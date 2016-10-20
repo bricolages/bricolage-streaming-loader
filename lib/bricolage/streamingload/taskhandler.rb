@@ -30,6 +30,7 @@ module Bricolage
 
         ctl_ds = ctx.get_data_source('sql', config.fetch('ctl-postgres-ds', 'db_ctl'))
         task_queue = ctx.get_data_source('sqs', config.fetch('task-queue-ds', 'sqs_task'))
+        log_table = config.fetch('log-table', 'strload_load_logs')
         service_logger =
           if config.key?('alert-level')
             new_alerting_logger(ctx, config)
@@ -40,6 +41,7 @@ module Bricolage
         task_handler = new(
           context: ctx,
           ctl_ds: ctl_ds,
+          log_table: log_table,
           task_queue: task_queue,
           working_dir: opts.working_dir,
           logger: service_logger,
@@ -90,9 +92,10 @@ module Bricolage
         # ignore
       end
 
-      def initialize(context:, ctl_ds:, task_queue:, working_dir:, logger:, job_class: Job)
+      def initialize(context:, ctl_ds:, log_table:, task_queue:, working_dir:, logger:, job_class: Job)
         @ctx = context
         @ctl_ds = ctl_ds
+        @log_table = log_table
         @task_queue = task_queue
         @working_dir = working_dir
         @logger = logger
@@ -102,7 +105,7 @@ module Bricolage
       attr_reader :logger
 
       def execute_task_by_id(task_id, force: false)
-        job = @job_class.new(context: @ctx, ctl_ds: @ctl_ds, task_id: task_id, force: force, logger: @logger)
+        job = new_job(task_id, force)
         job.execute(fail_fast: true)
       end
 
@@ -119,13 +122,17 @@ module Bricolage
       # message handler
       def handle_streaming_load_v3(t)
         Dir.chdir(@working_dir) {
-          job = @job_class.new(context: @ctx, ctl_ds: @ctl_ds, task_id: t.task_id, force: t.force?, logger: @logger)
+          job = new_job(t.task_id, t.force?)
           if job.execute
             @task_queue.delete_message(t)
           end
         }
       rescue Exception => ex
         @logger.exception ex
+      end
+
+      def new_job(task_id, force)
+        @job_class.new(context: @ctx, ctl_ds: @ctl_ds, log_table: @log_table, task_id: task_id, force: force, logger: @logger)
       end
 
       def job_class
