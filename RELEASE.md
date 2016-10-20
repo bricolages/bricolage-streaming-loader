@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.10.0
+
+- [new] Automatically complement strload_jobs status with Redshift-side log table.
+
 ## version 0.9.0
 
 - [new] Introduces Redshift-side load log table (strload_load_logs) for load duplication checking.
