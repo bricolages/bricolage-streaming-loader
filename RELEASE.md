@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.10.1
+
+- [fix] Fixes simple variable ref bug.
+
 ## version 0.10.0
 
 - [new] Automatically complement strload_jobs status with Redshift-side log table.
