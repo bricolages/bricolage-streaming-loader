@@ -135,7 +135,7 @@ module Bricolage
       end
 
       def new_job(task_id, force)
-        @job_class.new(context: @ctx, ctl_ds: @ctl_ds, data_ds: data_ds, log_table: @log_table, task_id: task_id, force: force, logger: @logger)
+        @job_class.new(context: @ctx, ctl_ds: @ctl_ds, data_ds: @data_ds, log_table: @log_table, task_id: task_id, force: force, logger: @logger)
       end
 
       def job_class
