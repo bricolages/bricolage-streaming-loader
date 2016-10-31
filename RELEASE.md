@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.10.2
+
+- [new] New parameter dispatch-interval.
+
 ## version 0.10.1
 
 - [fix] Fixes simple variable ref bug.

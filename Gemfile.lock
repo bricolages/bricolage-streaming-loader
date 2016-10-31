@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    bricolage-streamingload (0.10.1)
+    bricolage-streamingload (0.10.2)
       aws-sdk (~> 2.6.2)
       bricolage (~> 5.19.0)
       pg (~> 0.18.0)
@@ -9,12 +9,12 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
-    aws-sdk (2.6.10)
-      aws-sdk-resources (= 2.6.10)
-    aws-sdk-core (2.6.10)
+    aws-sdk (2.6.14)
+      aws-sdk-resources (= 2.6.14)
+    aws-sdk-core (2.6.14)
       jmespath (~> 1.0)
-    aws-sdk-resources (2.6.10)
-      aws-sdk-core (= 2.6.10)
+    aws-sdk-resources (2.6.14)
+      aws-sdk-core (= 2.6.14)
     bricolage (5.19.0)
       aws-sdk (~> 2)
       mysql2
@@ -77,4 +77,4 @@ DEPENDENCIES
   test-unit
 
 BUNDLED WITH
-   1.13.2
+   1.13.6
