@@ -7,6 +7,8 @@
 #redshift-ds: db_data
 #log-table: strload_load_logs
 
+#dispatch-interval: 60
+
 # To Enable SNS notification
 #sns-ds: sns
 #alert-level: warn
