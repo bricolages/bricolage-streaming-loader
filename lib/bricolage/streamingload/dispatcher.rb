@@ -52,7 +52,7 @@ module Bricolage
           task_queue: task_queue,
           object_buffer: object_buffer,
           url_patterns: url_patterns,
-          dispatch_interval: 60,
+          dispatch_interval: config.fetch('dispatch-interval', 60),
           logger: logger
         )
 
