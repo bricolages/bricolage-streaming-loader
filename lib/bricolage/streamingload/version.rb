@@ -1,5 +1,5 @@
 module Bricolage
   module StreamingLoad
-    VERSION = '0.10.2'
+    VERSION = '0.11.0'
   end
 end

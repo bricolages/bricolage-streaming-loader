@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.11.0
+
+- Loosen dependent Bricolage version
+
 ## version 0.10.2
 
 - [new] New parameter dispatch-interval.
