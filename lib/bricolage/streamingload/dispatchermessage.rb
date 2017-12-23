@@ -1,3 +1,4 @@
+require 'bricolage/streamingload/chunk'
 require 'bricolage/sqsdatasource'
 
 module Bricolage
@@ -144,12 +145,12 @@ module Bricolage
         true
       end
 
-      def created?
+      def created_event?
         !!(/\AObjectCreated:(?!Copy)/ =~ @name)
       end
 
-      def loadable_object(url_patterns)
-        LoadableObject.new(self, url_patterns.match(url))
+      def chunk
+        Chunk.new(id: nil, url: url, size: size)
       end
 
     end

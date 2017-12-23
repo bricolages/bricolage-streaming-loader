@@ -4,8 +4,9 @@ require 'bricolage/version'
 require 'bricolage/sqsdatasource'
 require 'bricolage/logger'
 require 'bricolage/streamingload/dispatchermessage'
-require 'bricolage/streamingload/objectbuffer'
-require 'bricolage/streamingload/urlpatterns'
+require 'bricolage/streamingload/loadermessage'
+require 'bricolage/streamingload/chunkrouter'
+require 'bricolage/streamingload/chunkbuffer'
 require 'bricolage/streamingload/alertinglogger'
 require 'aws-sdk'
 require 'yaml'
@@ -40,18 +41,18 @@ module Bricolage
           )
         end
 
-        object_buffer = ObjectBuffer.new(
+        chunk_buffer = ChunkBuffer.new(
           control_data_source: ctx.get_data_source('sql', config.fetch('ctl-postgres-ds', 'db_ctl')),
           logger: logger
         )
 
-        url_patterns = URLPatterns.for_config(config.fetch('url_patterns'))
+        chunk_router = ChunkRouter.for_config(config.fetch('url_patterns'))
 
         dispatcher = Dispatcher.new(
           event_queue: event_queue,
           task_queue: task_queue,
-          object_buffer: object_buffer,
-          url_patterns: url_patterns,
+          chunk_router: chunk_router,
+          chunk_buffer: chunk_buffer,
           dispatch_interval: config.fetch('dispatch-interval', 60),
           logger: logger
         )
@@ -82,11 +83,11 @@ module Bricolage
         # ignore
       end
 
-      def initialize(event_queue:, task_queue:, object_buffer:, url_patterns:, dispatch_interval:, logger:)
+      def initialize(event_queue:, task_queue:, chunk_router:, chunk_buffer:, dispatch_interval:, logger:)
         @event_queue = event_queue
         @task_queue = task_queue
-        @object_buffer = object_buffer
-        @url_patterns = url_patterns
+        @chunk_router = chunk_router
+        @chunk_buffer = chunk_buffer
         @dispatch_interval = dispatch_interval
         @dispatch_message_id = nil
         @logger = logger
@@ -111,86 +112,90 @@ module Bricolage
 
         if @dispatch_requested
           logger.info "*** dispatch requested"
-          dispatch_tasks
+          do_handle_dispatch
           @dispatch_requested = false
         end
 
         if @checkpoint_requested
-          create_checkpoint
+          do_handle_checkpoint
           @checkpoint_requested = false   # is needless, but reset it just in case
         end
       end
 
-      def handle_unknown(e)
-        logger.warn "unknown event: #{e.message_body}"
-        @event_queue.delete_message_async(e)
+      def handle_unknown(msg)
+        logger.warn "unknown event: #{msg.message_body}"
+        @event_queue.delete_message_async(msg)
       end
 
-      def handle_shutdown(e)
+      def handle_shutdown(msg)
         logger.info "*** shutdown requested"
         @event_queue.initiate_terminate
         # Delete this event immediately
-        @event_queue.delete_message(e)
+        @event_queue.delete_message(msg)
       end
 
-      def handle_checkpoint(e)
+      def handle_checkpoint(msg)
         # Delay creating CHECKPOINT after the current message batch,
         # because any other extra events are already received.
         @checkpoint_requested = true
         # Delete this event immediately
-        @event_queue.delete_message(e)
+        @event_queue.delete_message(msg)
       end
 
-      def create_checkpoint
+      def do_handle_checkpoint
         logger.info "*** checkpoint requested"
         logger.info "Force-flushing all objects..."
-        tasks = @object_buffer.flush_tasks_force
-        send_tasks tasks
+        tasks = @chunk_buffer.flush_all
+        dispatch_tasks tasks
         logger.info "All objects flushed; shutting down..."
         @event_queue.initiate_terminate
       end
 
-      def handle_data(e)
-        unless e.created?
-          @event_queue.delete_message_async(e)
+      def handle_data(msg)
+        unless msg.created_event?
+          @event_queue.delete_message_async(msg)
           return
         end
-        obj = e.loadable_object(@url_patterns)
-        @object_buffer.put(obj)
-        @event_queue.delete_message_async(e)
+        chunk = @chunk_router.route(msg)
+        @chunk_buffer.save(chunk)
+        @event_queue.delete_message_async(msg)
       end
 
-      def handle_dispatch(e)
+      def handle_dispatch(msg)
         # Dispatching tasks may takes 10 minutes or more, it can exceeds visibility timeout.
         # To avoid this, delay dispatching until all events of current message batch are processed.
-        if @dispatch_message_id == e.message_id
+        if @dispatch_message_id == msg.message_id
           @dispatch_requested = true
         end
-        @event_queue.delete_message_async(e)
+        @event_queue.delete_message_async(msg)
       end
 
-      def dispatch_tasks
-        tasks = @object_buffer.flush_tasks
-        send_tasks tasks
+      def do_handle_dispatch
+        tasks = @chunk_buffer.flush_partial
+        dispatch_tasks tasks
         set_dispatch_timer
       end
 
       def set_dispatch_timer
-        res = @event_queue.send_message(DispatchEvent.create(delay_seconds: @dispatch_interval))
+        res = @event_queue.send_message(DispatchDispatcherMessage.create(delay_seconds: @dispatch_interval))
         @dispatch_message_id = res.message_id
       end
 
-      def handle_flushtable(e)
-        logger.info "*** flushtable requested: table=#{e.table_name}"
-        tasks = @object_buffer.flush_table_force(e.table_name)
-        send_tasks tasks
+      def handle_flushtable(msg)
+        # FIXME: badly named attribute. table_name is really stream_name, which is called as data_source_id, too.
+        stream_name = msg.table_name
+
+        logger.info "*** flushtable requested: stream_name=#{stream_name}"
+        tasks = @chunk_buffer.flush_stream(stream_name)
+        dispatch_tasks tasks
         # Delete this event immediately
-        @event_queue.delete_message(e)
+        @event_queue.delete_message(msg)
       end
 
-      def send_tasks(tasks)
+      def dispatch_tasks(tasks)
         tasks.each do |task|
-          @task_queue.put task
+          msg = StreamingLoadV3LoaderMessage.for_load_task(task)
+          @task_queue.put msg
         end
       end
 

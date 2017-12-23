@@ -1,43 +1,12 @@
-require 'bricolage/streamingload/loadermessage'
+require 'bricolage/streamingload/loadtask'
+require 'bricolage/streamingload/chunk'
 require 'bricolage/sqlutils'
-require 'forwardable'
 
 module Bricolage
 
   module StreamingLoad
 
-    class LoadableObject
-
-      extend Forwardable
-
-      def initialize(event, components)
-        @event = event
-        @components = components
-      end
-
-      attr_reader :event
-
-      def_delegator '@event', :url
-      def_delegator '@event', :size
-      def_delegator '@event', :message_id
-      def_delegator '@event', :receipt_handle
-      def_delegator '@components', :schema_name
-      def_delegator '@components', :table_name
-
-      def data_source_id
-        "#{schema_name}.#{table_name}"
-      end
-
-      alias qualified_name data_source_id
-
-      def event_time
-        @event.time
-      end
-
-    end
-
-
-    class ObjectBuffer
+    class ChunkBuffer
 
       TASK_GENERATION_TIME_LIMIT = 30 #sec
 
@@ -49,74 +18,83 @@ module Bricolage
         @task_generation_time_limit = TASK_GENERATION_TIME_LIMIT
       end
 
-      def put(obj)
+      # chunk :: IncomingChunk
+      def save(chunk)
         @ctl_ds.open {|conn|
           suppress_sql_logging {
             conn.transaction {
-              object_id = insert_object(conn, obj)
+              object_id = insert_object(conn, chunk)
               if object_id
                 insert_task_objects(conn, object_id)
               else
-                insert_dup_object(conn, obj)
+                @logger.info "Duplicated object recieved: url=#{chunk.url}"
+                insert_dup_object(conn, chunk)
               end
             }
           }
         }
       end
 
-      # Flushes multiple tables periodically
-      def flush_tasks
-        task_ids = []
-        warn_slow_task_generation {
-          @ctl_ds.open {|conn|
+      # Flushes chunks of multiple streams, which are met conditions.
+      def flush_partial
+        task_ids = nil
+        tasks = nil
+
+        @ctl_ds.open {|conn|
+          warn_slow_task_generation {
             conn.transaction {|txn|
               task_ids = insert_tasks(conn)
-              unless task_ids.empty?
-                update_task_object_mappings(conn, task_ids)
-                log_mapped_object_num(conn, task_ids)
-              end
+              update_task_objects(conn, task_ids) unless task_ids.empty?
             }
           }
+          log_task_ids(task_ids)
+          tasks = load_tasks(conn, task_ids)
         }
-        return task_ids.map {|id| StreamingLoadV3LoaderMessage.create(task_id: id) }
+        tasks
       end
 
-      # Flushes all objects of all tables immediately with no
-      # additional conditions, to create "stream checkpoint".
-      def flush_tasks_force
-        task_ids  = []
+      # Flushes all chunks of all stream with no additional conditions,
+      # to create "system checkpoint".
+      def flush_all
+        all_task_ids = []
+        tasks = nil
+
         @ctl_ds.open {|conn|
           conn.transaction {|txn|
-            # update_task_object_mappings may not consume all saved objects
+            # update_task_objects may not consume all saved objects
             # (e.g. there are too many objects for one table), we must create
-            # tasks repeatedly until there are no unassigned objects.
-            until (ids = insert_tasks_force(conn)).empty?
-              update_task_object_mappings(conn, ids)
-              log_mapped_object_num(conn, ids)
-              task_ids.concat ids
+            # tasks repeatedly until all objects are flushed.
+            until (task_ids = insert_tasks(conn, force: true)).empty?
+              update_task_objects(conn, task_ids)
+              all_task_ids.concat task_ids
             end
           }
+          log_task_ids(all_task_ids)
+          tasks = load_tasks(conn, all_task_ids)
         }
-        return task_ids.map {|id| StreamingLoadV3LoaderMessage.create(task_id: id) }
+        tasks
       end
 
-      # Flushes the all objects of the specified table immediately
-      # with no additional conditions, to create "table checkpoint".
-      def flush_table_force(table_name)
-        task_ids  = []
+      # Flushes all chunks of the specified stream with no additional conditions,
+      # to create "stream checkpoint".
+      def flush_stream(stream_name)
+        all_task_ids = []
+        tasks = nil
+
         @ctl_ds.open {|conn|
           conn.transaction {|txn|
-            # update_task_object_mappings may not consume all saved objects
+            # update_task_objects may not consume all saved objects
             # (e.g. there are too many objects for one table), we must create
-            # tasks repeatedly until there are no unassigned objects.
-            until (ids = insert_table_task_force(conn, table_name)).empty?
-              update_task_object_mappings(conn, ids)
-              log_mapped_object_num(conn, ids)
-              task_ids.concat ids
+            # tasks repeatedly until all objects are flushed.
+            until (task_ids = insert_tasks_for_stream(conn, stream_name)).empty?
+              update_task_objects(conn, task_ids)
+              all_task_ids.concat task_ids
             end
           }
+          log_task_ids(all_task_ids)
+          tasks = load_tasks(conn, all_task_ids)
         }
-        return task_ids.map {|id| StreamingLoadV3LoaderMessage.create(task_id: id) }
+        tasks
       end
 
       private
@@ -134,7 +112,7 @@ module Bricolage
             values
                 ( #{s obj.url}
                 , #{obj.size}
-                , #{s obj.data_source_id}
+                , #{s obj.stream_name}
                 , #{s obj.message_id}
                 , '#{obj.event_time}' AT TIME ZONE 'JST'
                 , current_timestamp
@@ -148,7 +126,6 @@ module Bricolage
       end
 
       def insert_dup_object(conn, obj)
-        @logger.info "Duplicated object recieved: object_url=#{obj.url}"
         conn.update(<<-EndSQL)
             insert into strload_dup_objects
                 ( object_url
@@ -161,7 +138,7 @@ module Bricolage
             values
                 ( #{s obj.url}
                 , #{obj.size}
-                , #{s obj.data_source_id}
+                , #{s obj.stream_name}
                 , #{s obj.message_id}
                 , '#{obj.event_time}' AT TIME ZONE 'JST'
                 , current_timestamp
@@ -182,10 +159,6 @@ module Bricolage
                 )
             ;
         EndSQL
-      end
-
-      def insert_tasks_force(conn)
-        insert_tasks(conn, force: true)
       end
 
       def insert_tasks(conn, force: false)
@@ -239,11 +212,10 @@ module Bricolage
             ;
         EndSQL
 
-        log_created_tasks task_ids
         task_ids
       end
 
-      def insert_table_task_force(conn, table_name)
+      def insert_tasks_for_stream(conn, stream_name)
         task_ids = conn.query_values(<<-EndSQL)
             insert into strload_tasks
                 ( task_class
@@ -273,17 +245,15 @@ module Bricolage
                 using (data_source_id)
             where
                 -- does not check disabled
-                data_source_id = #{s table_name}
+                data_source_id = #{s stream_name}
             returning task_id
             ;
         EndSQL
 
-        # It must be 1
-        log_created_tasks(task_ids)
         task_ids
       end
 
-      def update_task_object_mappings(conn, task_ids)
+      def update_task_objects(conn, task_ids)
         conn.update(<<-EndSQL)
             update strload_task_objects dst
             set
@@ -309,25 +279,36 @@ module Bricolage
                 and tsk_obj.object_seq <= tables.load_batch_size
             ;
         EndSQL
+        # UPDATE statement cannot return values
+        nil
       end
 
-      def log_mapped_object_num(conn, task_ids)
-        # This method is required since UPDATE does not "returning" multiple values
-        rows = conn.query_values(<<-EndSQL)
-            select
-                task_id
-                , count(*)
-            from
-                strload_task_objects
-            where
-                task_id in (#{task_ids.join(',')})
-            group by
-                task_id
-            ;
-        EndSQL
-        rows.each_slice(2) do |task_id, object_count|
-          @logger.info "Number of objects assigned to task: task_id=#{task_id} object_count=#{object_count}"
-        end
+      def load_tasks(conn, task_ids)
+        return [] if task_ids.empty?
+
+        records = suppress_sql_logging {
+          conn.query_rows(<<-EndSQL)
+              select
+                  t.task_id
+                  , t.object_id
+                  , o.object_url
+                  , o.object_size
+              from
+                  strload_task_objects t
+                  inner join strload_objects o using (object_id)
+              where
+                  task_id in (#{task_ids.join(',')})
+              ;
+          EndSQL
+        }
+
+        records.group_by {|row| row['task_id'] }.map {|task_id, rows|
+          chunks = rows.map {|row|
+            id, url, size = row.values_at('object_id', 'object_url', 'object_size')
+            Chunk.new(id: id, url: url, size: size)
+          }
+          LoadTask.new(id: task_id, chunks: chunks)
+        }
       end
 
       def suppress_sql_logging
@@ -341,7 +322,7 @@ module Bricolage
         end
       end
 
-      def log_created_tasks(task_ids)
+      def log_task_ids(task_ids)
         created_task_num = task_ids.size
         @logger.info "Number of task created: #{created_task_num}"
         @logger.info "Created task ids: #{task_ids}" if created_task_num > 0

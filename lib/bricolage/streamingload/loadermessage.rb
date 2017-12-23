@@ -26,6 +26,10 @@ module Bricolage
 
     class StreamingLoadV3LoaderMessage < LoaderMessage
 
+      def StreamingLoadV3LoaderMessage.for_load_task(load_task)
+        create(task_id: load_task.id)
+      end
+
       def StreamingLoadV3LoaderMessage.create(task_id:, force: false)
         super name: 'streaming_load_v3', task_id: task_id, force: force
       end
