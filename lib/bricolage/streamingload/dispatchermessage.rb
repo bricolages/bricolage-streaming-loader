@@ -4,15 +4,15 @@ module Bricolage
 
   module StreamingLoad
 
-    class Event < SQSMessage
+    class DispatcherMessage < SQSMessage
 
-      def Event.get_concrete_class(msg, rec)
+      def DispatcherMessage.get_concrete_class(msg, rec)
         case
-        when rec['eventName'] == 'shutdown' then ShutdownEvent
-        when rec['eventName'] == 'dispatch' then DispatchEvent
-        when rec['eventName'] == 'flushtable' then FlushTableEvent
-        when rec['eventName'] == 'checkpoint' then CheckPointEvent
-        when !!rec['s3'] then S3ObjectEvent
+        when rec['eventName'] == 'shutdown' then ShutdownDispatcherMessage
+        when rec['eventName'] == 'dispatch' then DispatchDispatcherMessage
+        when rec['eventName'] == 'flushtable' then FlushTableDispatcherMessage
+        when rec['eventName'] == 'checkpoint' then CheckPointDispatcherMessage
+        when !!rec['s3'] then S3ObjectDispatcherMessage
         else UnknownSQSMessage
         end
       end
@@ -28,13 +28,13 @@ module Bricolage
     end
 
 
-    class ShutdownEvent < Event
+    class ShutdownDispatcherMessage < DispatcherMessage
 
-      def ShutdownEvent.create
+      def ShutdownDispatcherMessage.create
         super name: 'shutdown'
       end
 
-      def ShutdownEvent.parse_sqs_record(msg, rec)
+      def ShutdownDispatcherMessage.parse_sqs_record(msg, rec)
         {}
       end
 
@@ -47,13 +47,13 @@ module Bricolage
 
 
     # Flushes all tables and shutdown
-    class CheckPointEvent < Event
+    class CheckPointDispatcherMessage < DispatcherMessage
 
-      def CheckPointEvent.create
+      def CheckPointDispatcherMessage.create
         super name: 'checkpoint'
       end
 
-      def CheckPointEvent.parse_sqs_record(msg, rec)
+      def CheckPointDispatcherMessage.parse_sqs_record(msg, rec)
         {}
       end
 
@@ -65,13 +65,13 @@ module Bricolage
     end
 
 
-    class FlushTableEvent < Event
+    class FlushTableDispatcherMessage < DispatcherMessage
 
-      def FlushTableEvent.create(table_name:)
+      def FlushTableDispatcherMessage.create(table_name:)
         super name: 'flushtable', table_name: table_name
       end
 
-      def FlushTableEvent.parse_sqs_record(msg, rec)
+      def FlushTableDispatcherMessage.parse_sqs_record(msg, rec)
         {
           table_name: rec['tableName']
         }
@@ -94,9 +94,9 @@ module Bricolage
     end
 
 
-    class DispatchEvent < Event
+    class DispatchDispatcherMessage < DispatcherMessage
 
-      def DispatchEvent.create(delay_seconds:)
+      def DispatchDispatcherMessage.create(delay_seconds:)
         super name: 'dispatch', delay_seconds: delay_seconds
       end
 
@@ -108,9 +108,9 @@ module Bricolage
     end
 
 
-    class S3ObjectEvent < Event
+    class S3ObjectDispatcherMessage < DispatcherMessage
 
-      def S3ObjectEvent.parse_sqs_record(msg, rec)
+      def S3ObjectDispatcherMessage.parse_sqs_record(msg, rec)
         {
           region: rec['awsRegion'],
           bucket: rec['s3']['bucket']['name'],

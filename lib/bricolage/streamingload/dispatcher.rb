@@ -3,7 +3,7 @@ require 'bricolage/exception'
 require 'bricolage/version'
 require 'bricolage/sqsdatasource'
 require 'bricolage/logger'
-require 'bricolage/streamingload/event'
+require 'bricolage/streamingload/dispatchermessage'
 require 'bricolage/streamingload/objectbuffer'
 require 'bricolage/streamingload/urlpatterns'
 require 'bricolage/streamingload/alertinglogger'
@@ -99,7 +99,7 @@ module Bricolage
       def event_loop
         logger.info "*** dispatcher started: pid=#{$$}"
         set_dispatch_timer
-        @event_queue.handle_messages(handler: self, message_class: Event)
+        @event_queue.handle_messages(handler: self, message_class: DispatcherMessage)
         @event_queue.process_async_delete_force
         logger.info "*** shutdown gracefully: pid=#{$$}"
       end

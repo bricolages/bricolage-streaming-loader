@@ -1,12 +1,12 @@
 require 'test/unit'
-require 'bricolage/streamingload/event'
+require 'bricolage/streamingload/dispatchermessage'
 
 module Bricolage::StreamingLoad
 
-  class TestEvent < Test::Unit::TestCase
+  class TestDispatcherMessage < Test::Unit::TestCase
 
     def new_s3event(message_id: nil, receipt_handle: nil, name: nil, time: nil, source: nil, region: nil, bucket: nil, key: nil, size: nil)
-      S3ObjectEvent.new(
+      S3ObjectDispatcherMessage.new(
         message_id: message_id,
         receipt_handle: receipt_handle,
         name: name,
@@ -21,9 +21,9 @@ module Bricolage::StreamingLoad
 
     test "#created?" do
       e = new_s3event(name: "ObjectCreated:Put")
-      assert_true e.created?
+      assert_true e.created_event?
       e = new_s3event(name: "ObjectCreated:Copy")
-      assert_false e.created?
+      assert_false e.created_event?
     end
 
   end
