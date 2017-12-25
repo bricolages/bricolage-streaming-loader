@@ -86,8 +86,8 @@ module Bricolage
           end
 
           if @task.unknown_state?
-            true_status = DataConnection.open(@data_ds, @logger) {|data|
-              data.get_job_status(@log_table, @task.last_job_id)
+            true_status = DataConnection.open(@data_ds, log_table: @log_table, logger: @logger) {|data|
+              data.get_job_status(@task.last_job_id)
             }
             @logger.info "fixiating unknown job status: job_id=#{@task.last_job_id}, status=(unknown->#{true_status})"
             @task.fix_last_job_status true_status
@@ -142,11 +142,14 @@ module Bricolage
         params = JobParams.load(@context, task.task_class, task.schema_name, task.table_name)
         @data_ds = params.ds
         @manifest = ManifestFile.create(ds: params.ctl_bucket, job_id: job_id, object_urls: task.object_urls, logger: @logger)
-        DataConnection.open(params.ds, @logger) {|data|
+        log = LoadLog.new
+        log.task_id = @task_id
+        log.job_id = job_id
+        DataConnection.open(params.ds, log_table: @log_table, logger: @logger) {|data|
           if params.enable_work_table?
-            data.load_with_work_table params.work_table, @manifest, params.load_options_string, params.sql_source, @log_table, job_id
+            data.load_with_work_table params.work_table, @manifest, params.load_options_string, params.sql_source, log
           else
-            data.load_objects params.dest_table, @manifest, params.load_options_string, @log_table, job_id
+            data.load_objects params.dest_table, @manifest, params.load_options_string, log
           end
         }
       end
@@ -175,18 +178,22 @@ module Bricolage
       end
 
 
+      LoadLog = Struct.new(:task_id, :job_id)
+
+
       class DataConnection
 
         include SQLUtils
 
-        def DataConnection.open(ds, logger = ds.logger, &block)
-          new(ds, logger).open(&block)
+        def DataConnection.open(ds, log_table:, logger: ds.logger, &block)
+          new(ds, log_table: log_table, logger: logger).open(&block)
         end
 
-        def initialize(ds, logger = ds.logger)
+        def initialize(ds, log_table:, logger: ds.logger)
           @ds = ds
-          @connection = nil
+          @log_table = log_table
           @logger = logger
+          @connection = nil
         end
 
         def open(&block)
@@ -198,27 +205,27 @@ module Bricolage
           raise DataConnectionFailed, "data connection failed: #{ex.message}"
         end
 
-        def get_job_status(log_table, job_id)
-          count = @connection.query_value("select count(*) from #{log_table} where job_id = #{job_id}")
+        def get_job_status(job_id)
+          count = @connection.query_value("select count(*) from #{@log_table} where job_id = #{job_id}")
           count.to_i > 0 ? 'success' : 'failure'
         end
 
-        def load_with_work_table(work_table, manifest, options, sql_source, log_table, job_id)
+        def load_with_work_table(work_table, manifest, options, sql_source, log)
           @connection.transaction {|txn|
             # NOTE: This transaction ends with truncation, this DELETE does nothing
             # from the second time.  So don't worry about DELETE cost here.
             @connection.execute("delete from #{work_table}")
             execute_copy work_table, manifest, options
             @connection.execute sql_source
-            write_load_log log_table, job_id
+            write_load_log log
             txn.truncate_and_commit work_table
           }
         end
 
-        def load_objects(dest_table, manifest, options, log_table, job_id)
+        def load_objects(dest_table, manifest, options, log)
           @connection.transaction {|txn|
             execute_copy dest_table, manifest, options
-            write_load_log log_table, job_id
+            write_load_log log
           }
         end
 
@@ -236,8 +243,8 @@ module Bricolage
           @logger.info "load succeeded: #{manifest.url}"
         end
 
-        def write_load_log(log_table, job_id)
-          @connection.execute("insert into #{log_table} (job_id, finish_time) values (#{job_id}, current_timestamp)")
+        def write_load_log(log)
+          @connection.execute("insert into #{@log_table} (task_id, job_id, finish_time) values (#{log.task_id}, #{log.job_id}, current_timestamp)")
         end
 
       end   # class DataConnection

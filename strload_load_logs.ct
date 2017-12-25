@@ -5,6 +5,7 @@
 */
 create table $dest_table
 ( job_id bigint encode raw
+, task_id bigint encode zstd
 , finish_time timestamp encode delta
 )
 distkey (job_id)

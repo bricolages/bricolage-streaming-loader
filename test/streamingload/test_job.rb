@@ -30,7 +30,7 @@ module Bricolage
           assert_equal [
             "begin transaction;",
             "copy testschema.desttable from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
-            "insert into strload_load_logs (job_id, finish_time) values (#{job.job_id}, current_timestamp)",
+            "insert into strload_load_logs (task_id, job_id, finish_time) values (1, #{job.job_id}, current_timestamp)",
             "commit;"
           ], job.data_ds.sql_list
 
@@ -58,7 +58,7 @@ module Bricolage
             "delete from testschema.with_work_table_wk",
             "copy testschema.with_work_table_wk from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
             "insert into testschema.with_work_table select * from testschema.with_work_table_wk;\n",
-            "insert into strload_load_logs (job_id, finish_time) values (#{job.job_id}, current_timestamp)",
+            "insert into strload_load_logs (task_id, job_id, finish_time) values (11, #{job.job_id}, current_timestamp)",
             "truncate testschema.with_work_table_wk;"
           ], job.data_ds.sql_list
 
@@ -114,7 +114,7 @@ module Bricolage
           assert_equal [
             "begin transaction;",
             "copy testschema.desttable from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
-            "insert into strload_load_logs (job_id, finish_time) values (#{job.job_id}, current_timestamp)",
+            "insert into strload_load_logs (task_id, job_id, finish_time) values (11, #{job.job_id}, current_timestamp)",
             "commit;"
           ], job.data_ds.sql_list
 
@@ -303,7 +303,7 @@ module Bricolage
           assert_equal [
             "begin transaction;",
             "copy testschema.desttable from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
-            "insert into strload_load_logs (job_id, finish_time) values (#{job.job_id}, current_timestamp)",
+            "insert into strload_load_logs (task_id, job_id, finish_time) values (11, #{job.job_id}, current_timestamp)",
             "commit;"
           ], job.data_ds.sql_list
 
