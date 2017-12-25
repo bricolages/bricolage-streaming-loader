@@ -1,4 +1,4 @@
-require 'bricolage/streamingload/task'
+require 'bricolage/streamingload/loadermessage'
 require 'bricolage/sqlutils'
 require 'forwardable'
 
@@ -78,7 +78,7 @@ module Bricolage
             }
           }
         }
-        return task_ids.map {|id| LoadTask.create(task_id: id) }
+        return task_ids.map {|id| StreamingLoadV3LoaderMessage.create(task_id: id) }
       end
 
       # Flushes all objects of all tables immediately with no
@@ -97,7 +97,7 @@ module Bricolage
             end
           }
         }
-        return task_ids.map {|id| LoadTask.create(task_id: id) }
+        return task_ids.map {|id| StreamingLoadV3LoaderMessage.create(task_id: id) }
       end
 
       # Flushes the all objects of the specified table immediately
@@ -116,7 +116,7 @@ module Bricolage
             end
           }
         }
-        return task_ids.map {|id| LoadTask.create(task_id: id) }
+        return task_ids.map {|id| StreamingLoadV3LoaderMessage.create(task_id: id) }
       end
 
       private

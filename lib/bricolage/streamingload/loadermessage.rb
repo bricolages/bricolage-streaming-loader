@@ -4,11 +4,11 @@ module Bricolage
 
   module StreamingLoad
 
-    class Task < SQSMessage
+    class LoaderMessage < SQSMessage
 
-      def Task.get_concrete_class(msg, rec)
+      def LoaderMessage.get_concrete_class(msg, rec)
         case
-        when rec['eventName'] == 'streaming_load_v3' then LoadTask
+        when rec['eventName'] == 'streaming_load_v3' then StreamingLoadV3LoaderMessage
         else UnknownSQSMessage
         end
       end
@@ -24,13 +24,13 @@ module Bricolage
     end
 
 
-    class LoadTask < Task
+    class StreamingLoadV3LoaderMessage < LoaderMessage
 
-      def LoadTask.create(task_id:, force: false)
+      def StreamingLoadV3LoaderMessage.create(task_id:, force: false)
         super name: 'streaming_load_v3', task_id: task_id, force: force
       end
 
-      def LoadTask.parse_sqs_record(msg, rec)
+      def StreamingLoadV3LoaderMessage.parse_sqs_record(msg, rec)
         {
           task_id: rec['taskId'],
           force: (rec['force'].to_s == 'true')
