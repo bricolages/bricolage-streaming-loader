@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.12.0
+
+- [CHANGE] Adds task_id column to the log table (strload_load_logs).
+
 ## version 0.11.0
 
 - Loosen dependent Bricolage version
