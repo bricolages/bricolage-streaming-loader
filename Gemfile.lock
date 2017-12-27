@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    bricolage-streamingload (0.11.0)
+    bricolage-streamingload (0.12.0)
       aws-sdk (~> 2.6.2)
       bricolage (>= 5.19.0)
       pg (~> 0.18.0)
