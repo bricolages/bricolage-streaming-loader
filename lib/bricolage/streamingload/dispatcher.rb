@@ -61,6 +61,8 @@ module Bricolage
         create_pid_file opts.pid_file_path if opts.pid_file_path
         Dir.chdir '/'
         dispatcher.event_loop
+      rescue SystemExit
+        ;
       rescue Exception => e
         logger.exception e
         logger.error "dispatcher abort: pid=#{$$}"
@@ -212,9 +214,6 @@ module Bricolage
         @rest_arguments = nil
 
         @opts = opts = OptionParser.new("Usage: #{$0} CONFIG_PATH")
-        opts.on('--task-id=id', 'Execute oneshot load task (implicitly disables daemon mode).') {|task_id|
-          @task_id = task_id
-        }
         opts.on('-e', '--environment=NAME', "Sets execution environment [default: #{Context::DEFAULT_ENV}]") {|env|
           @environment = env
         }
