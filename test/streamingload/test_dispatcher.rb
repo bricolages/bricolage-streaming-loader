@@ -3,6 +3,8 @@ require 'bricolage/context'
 require 'bricolage/sqsdatasource'
 require 'bricolage/sqsmock'
 require 'bricolage/streamingload/dispatcher'
+require 'bricolage/streamingload/chunkrouter'
+require 'bricolage/streamingload/chunkbuffer'
 
 module Bricolage
   module StreamingLoad
@@ -35,12 +37,12 @@ module Bricolage
 
         task_queue = SQSDataSource.new_mock
 
-        object_buffer = ObjectBuffer.new(
+        chunk_buffer = ChunkBuffer.new(
           control_data_source: ctl_ds,
           logger: ctx.logger
         )
 
-        url_patterns = URLPatterns.for_config([
+        chunk_router = ChunkRouter.for_config([
           {
             "url" => %r<\As3://test-bucket/testschema\.desttable/datafile-\d{4}\.json\.gz>.source,
             "schema" => 'testschema',
@@ -51,8 +53,8 @@ module Bricolage
         dispatcher = Dispatcher.new(
           event_queue: event_queue,
           task_queue: task_queue,
-          object_buffer: object_buffer,
-          url_patterns: url_patterns,
+          chunk_buffer: chunk_buffer,
+          chunk_router: chunk_router,
           dispatch_interval: 600,
           logger: ctx.logger
         )
@@ -127,12 +129,12 @@ module Bricolage
 
         task_queue = SQSDataSource.new_mock
 
-        object_buffer = ObjectBuffer.new(
+        chunk_buffer = ChunkBuffer.new(
           control_data_source: ctl_ds,
           logger: ctx.logger
         )
 
-        url_patterns = URLPatterns.for_config([
+        chunk_router = ChunkRouter.for_config([
           {
             "url" => %r<\As3://test-bucket/testschema\.(?<table>\w+)/datafile-\d{4}\.json\.gz>.source,
             "schema" => 'testschema',
@@ -143,8 +145,8 @@ module Bricolage
         dispatcher = Dispatcher.new(
           event_queue: event_queue,
           task_queue: task_queue,
-          object_buffer: object_buffer,
-          url_patterns: url_patterns,
+          chunk_buffer: chunk_buffer,
+          chunk_router: chunk_router,
           dispatch_interval: 600,
           logger: ctx.logger
         )

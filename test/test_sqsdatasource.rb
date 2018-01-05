@@ -1,5 +1,4 @@
 require 'test/unit'
-require 'bricolage/streamingload/event'
 require 'bricolage/sqsmock'
 require 'bricolage/logger'
 

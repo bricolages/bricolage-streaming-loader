@@ -1,6 +1,6 @@
 require 'bricolage/context'
 require 'bricolage/sqsdatasource'
-require 'bricolage/streamingload/task'
+require 'bricolage/streamingload/loadermessage'
 require 'bricolage/streamingload/job'
 require 'bricolage/streamingload/alertinglogger'
 require 'bricolage/logger'
@@ -113,7 +113,7 @@ module Bricolage
       end
 
       def event_loop
-        @task_queue.handle_messages(handler: self, message_class: Task)
+        @task_queue.handle_messages(handler: self, message_class: LoaderMessage)
       end
 
       # message handler
