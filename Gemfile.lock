@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    bricolage-streamingload (0.12.0)
+    bricolage-streamingload (0.14.0)
       aws-sdk (~> 2.6.2)
       bricolage (>= 5.19.0)
       pg (~> 0.18.0)
@@ -17,7 +17,7 @@ GEM
     aws-sdk-resources (2.6.50)
       aws-sdk-core (= 2.6.50)
     aws-sigv4 (1.0.2)
-    bricolage (5.24.3)
+    bricolage (5.24.4)
       aws-sdk (~> 2)
       mysql2
       pg (~> 0.18.0)
@@ -33,7 +33,7 @@ GEM
       method_source (~> 0.9.0)
     rake (12.3.0)
     redis (4.0.1)
-    test-unit (3.2.6)
+    test-unit (3.2.7)
       power_assert
 
 PLATFORMS
