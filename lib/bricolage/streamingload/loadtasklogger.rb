@@ -8,6 +8,7 @@ module Bricolage
 
       def initialize(s3ds)
         @s3ds = s3ds
+        @logger = @s3ds.logger
       end
 
       def log(task)
@@ -24,7 +25,7 @@ module Bricolage
 
       def content(task)
         buf = StringIO.new
-        tasks.chunks.each do |chunk|
+        task.chunks.each do |chunk|
           buf.puts %Q("#{task.id}","#{chunk.id}","#{chunk.url}")
         end
         buf.string
