@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.14.0
+
+- [new] Logs (task - object) relashonships to S3 on dispatch, as a DB backup.
+
 ## version 0.13.0
 
 - grand refactoring
