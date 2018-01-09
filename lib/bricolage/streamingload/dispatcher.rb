@@ -63,6 +63,11 @@ module Bricolage
           logger: logger
         )
 
+        if opts.task_id
+          dispatcher.dispatch_tasks chunk_buffer.load_tasks_by_id([opts.task_id])
+          exit 0
+        end
+
         Process.daemon(true) if opts.daemon?
         create_pid_file opts.pid_file_path if opts.pid_file_path
         Dir.chdir '/'
@@ -219,6 +224,7 @@ module Bricolage
         @daemon = false
         @log_file_path = nil
         @pid_file_path = nil
+        @task_id = nil
         @rest_arguments = nil
 
         @opts = opts = OptionParser.new("Usage: #{$0} CONFIG_PATH")
@@ -233,6 +239,9 @@ module Bricolage
         }
         opts.on('--pid-file=PATH', 'Creates PID file.') {|path|
           @pid_file_path = path
+        }
+        opts.on('--task-id=ID', 'Dispatches this task and quit.') {|id|
+          @task_id = id.to_i
         }
         opts.on('--help', 'Prints this message and quit.') {
           puts opts.help
@@ -262,6 +271,8 @@ module Bricolage
       end
 
       attr_reader :pid_file_path
+
+      attr_reader :task_id
 
     end
 

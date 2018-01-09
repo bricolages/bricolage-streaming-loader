@@ -97,6 +97,12 @@ module Bricolage
         tasks
       end
 
+      def load_tasks_by_id(ids)
+        @ctl_ds.open {|conn|
+          return load_tasks(conn, ids)
+        }
+      end
+
       private
 
       def insert_object(conn, obj)
