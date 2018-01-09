@@ -66,13 +66,13 @@ module Bricolage
         Process.daemon(true) if opts.daemon?
         create_pid_file opts.pid_file_path if opts.pid_file_path
         Dir.chdir '/'
-        dispatcher.event_loop
-      rescue SystemExit
-        ;
-      rescue Exception => e
-        logger.exception e
-        logger.error "dispatcher abort: pid=#{$$}"
-        raise
+        begin
+          dispatcher.event_loop
+        rescue Exception => e
+          logger.exception e
+          logger.error "dispatcher abort: pid=#{$$}"
+          raise
+        end
       end
 
       def Dispatcher.new_logger(path, config)
