@@ -7,6 +7,7 @@ require 'bricolage/streamingload/dispatchermessage'
 require 'bricolage/streamingload/loadermessage'
 require 'bricolage/streamingload/chunkrouter'
 require 'bricolage/streamingload/chunkbuffer'
+require 'bricolage/streamingload/loadtasklogger'
 require 'bricolage/streamingload/alertinglogger'
 require 'aws-sdk'
 require 'yaml'
@@ -48,11 +49,16 @@ module Bricolage
 
         chunk_router = ChunkRouter.for_config(config.fetch('url_patterns'))
 
+        task_logger = LoadTaskLogger.new(
+          ctx.get_data_source('s3', config.fetch('ctl-s3-ds', 's3_ctl'))
+        )
+
         dispatcher = Dispatcher.new(
           event_queue: event_queue,
           task_queue: task_queue,
           chunk_router: chunk_router,
           chunk_buffer: chunk_buffer,
+          task_logger: task_logger,
           dispatch_interval: config.fetch('dispatch-interval', 60),
           logger: logger
         )
@@ -85,11 +91,12 @@ module Bricolage
         # ignore
       end
 
-      def initialize(event_queue:, task_queue:, chunk_router:, chunk_buffer:, dispatch_interval:, logger:)
+      def initialize(event_queue:, task_queue:, chunk_router:, chunk_buffer:, task_logger:, dispatch_interval:, logger:)
         @event_queue = event_queue
         @task_queue = task_queue
         @chunk_router = chunk_router
         @chunk_buffer = chunk_buffer
+        @task_logger = task_logger
         @dispatch_interval = dispatch_interval
         @dispatch_message_id = nil
         @logger = logger
@@ -198,6 +205,7 @@ module Bricolage
         tasks.each do |task|
           msg = StreamingLoadV3LoaderMessage.for_load_task(task)
           @task_queue.put msg
+          @task_logger.log task
         end
       end
 

@@ -50,11 +50,14 @@ module Bricolage
           }
         ])
 
+        task_logger = DummyLoadTaskLogger.new
+
         dispatcher = Dispatcher.new(
           event_queue: event_queue,
           task_queue: task_queue,
           chunk_buffer: chunk_buffer,
           chunk_router: chunk_router,
+          task_logger: task_logger,
           dispatch_interval: 600,
           logger: ctx.logger
         )
@@ -93,6 +96,10 @@ module Bricolage
         assert_equal 'testschema', task.schema_name
         assert_equal 'desttable', task.table_name
         assert_equal 10, task.object_urls.size
+
+        # Task Logger
+        assert_not_nil task_logger.last_task
+        assert_equal task_id, task_logger.last_task.id.to_i
       end
 
       def unassigned_objects(ctl_ds)
@@ -142,11 +149,14 @@ module Bricolage
           }
         ])
 
+        task_logger = DummyLoadTaskLogger.new
+
         dispatcher = Dispatcher.new(
           event_queue: event_queue,
           task_queue: task_queue,
           chunk_buffer: chunk_buffer,
           chunk_router: chunk_router,
+          task_logger: task_logger,
           dispatch_interval: 600,
           logger: ctx.logger
         )
@@ -186,6 +196,10 @@ module Bricolage
         assert_equal 'testschema', task.schema_name
         assert_equal 'bbb', task.table_name
         assert_equal 2, task.object_urls.size
+
+        # Task Logger
+        assert_not_nil task_logger.last_task
+        assert_equal task_id, task_logger.last_task.id.to_i
       end
 
       def unassigned_table_objects(ctl_ds, table_name)
@@ -201,6 +215,24 @@ module Bricolage
               ;
           EndSQL
         }
+      end
+
+    end
+
+
+    class DummyLoadTaskLogger
+
+      def initialize
+        @task = nil
+      end
+
+      def log(task)
+        @task = task
+        nil
+      end
+
+      def last_task
+        @task
       end
 
     end
