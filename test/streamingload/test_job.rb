@@ -161,8 +161,7 @@ module Bricolage
             [1001, 's3://data-bucket/testschema.sql_fails/0001.json.gz', 1024, 'testschema.sql_fails', 'mmmm', current_timestamp, current_timestamp],
             [1002, 's3://data-bucket/testschema.sql_fails/0002.json.gz', 1024, 'testschema.sql_fails', 'mmmm', current_timestamp, current_timestamp]
           db.insert_into 'strload_jobs',
-            [101, 11, 'localhost-1234', 'failure', current_timestamp, current_timestamp, 'query failed'],
-            [102, 11, 'localhost-1234', 'failure', current_timestamp, current_timestamp, 'query failed']
+            [101, 11, 'localhost-1234', 'failure', current_timestamp, current_timestamp, 'query failed']
 
           job = new_job(task_id: 11, force: false)
           assert_raise(JobFailure) {
@@ -178,7 +177,7 @@ module Bricolage
           assert_equal 11, job_row['task_id'].to_i
           assert_equal job.process_id, job_row['process_id']
           assert_equal 'failure', job_row['status']
-          assert(/retry\#2/ =~ job_row['message'])
+          assert(/retry\#1/ =~ job_row['message'])
         }
       end
 
