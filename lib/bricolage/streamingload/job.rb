@@ -69,7 +69,7 @@ module Bricolage
         return true
       end
 
-      MAX_RETRY = 5
+      MAX_RETRY = 2
 
       def execute_task
         @process_id = "#{Socket.gethostname}-#{$$}"
