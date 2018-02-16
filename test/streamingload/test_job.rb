@@ -266,6 +266,33 @@ module Bricolage
         }
       end
 
+      test "execute_task (load error)" do
+        setup_context {|db|
+          db.insert_into 'strload_tables', [1, 'testschema.load_error', 'testschema', 'load_error', 100, 1800, false]
+          db.insert_into 'strload_tasks', [11, 'streaming_load_v3', 1, current_timestamp]
+          db.insert_into 'strload_task_objects', [11, 1001], [11, 1002]
+          db.insert_into 'strload_objects',
+            [1001, 's3://data-bucket/testschema.desttable/0001.json.gz', 1024, 'testschema.desttable', 'mmmm', current_timestamp, current_timestamp],
+            [1002, 's3://data-bucket/testschema.desttable/0002.json.gz', 1024, 'testschema.desttable', 'mmmm', current_timestamp, current_timestamp]
+
+          job = new_job(task_id: 11, force: false)
+          assert_raise(JobError) {
+            job.execute_task
+          }
+          assert_equal [
+            "begin transaction;",
+            "copy testschema.load_error from '#{job.manifest.url}' credentials 'cccc' manifest statupdate false compupdate false json 'auto' gzip timeformat 'auto' dateformat 'auto' acceptanydate acceptinvchars ' ' truncatecolumns trimblanks ;",
+            "abort;"
+          ], job.data_ds.sql_list
+
+          job_row = db.query_row("select * from strload_jobs where job_id = #{job.job_id}")
+          assert_equal 11, job_row['task_id'].to_i
+          assert_equal job.process_id, job_row['process_id']
+          assert_equal 'error', job_row['status']
+          assert(/stl_load_errors/ =~ job_row['message'])
+        }
+      end
+
       test "execute_task (unknown status, really=success)" do
         setup_context {|db|
           db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false]
@@ -429,11 +456,12 @@ module Bricolage
       class PSQLDataSourceMock < DataSource
         declare_type 'psql_mock'
 
-        def initialize(fail_pattern: nil, error_pattern: nil, exception_pattern: nil, **params)
+        def initialize(fail_pattern: nil, error_pattern: nil, exception_pattern: nil, load_error_pattern: nil, **params)
           @sql_list = []
           @fail_pattern = fail_pattern ? Regexp.compile(fail_pattern) : nil
           @error_pattern = error_pattern ? Regexp.compile(error_pattern) : nil
           @exception_pattern = exception_pattern ? Regexp.compile(exception_pattern) : nil
+          @load_error_pattern = load_error_pattern ? Regexp.compile(load_error_pattern) : nil
           @job_status = {}
         end
 
@@ -459,6 +487,9 @@ module Bricolage
           end
           if @exception_pattern and @exception_pattern =~ sql
             raise ArgumentError, "unexpected exception"
+          end
+          if @load_error_pattern and @load_error_pattern =~ sql
+            raise JobError, "Load into table 'xxxx_table' failed.  Check 'stl_load_errors' system table for details."
           end
         end
 
