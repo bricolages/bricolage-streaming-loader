@@ -241,6 +241,12 @@ module Bricolage
               ;
           EndSQL
           @logger.info "load succeeded: #{manifest.url}"
+        rescue JobFailure => ex
+          if /stl_load_errors/ =~ ex.message
+            # We cannot resolve this load error by retry, give up now.
+            raise JobError, ex.message
+          end
+          raise
         end
 
         def write_load_log(log)
