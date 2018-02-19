@@ -12,6 +12,7 @@ db_data_mock:
   fail_pattern: sql_fails
   error_pattern: job_error
   exception_pattern: unexpected_error
+  load_error_pattern: load_error
 
 s3_ctl_mock:
   type: s3_mock
