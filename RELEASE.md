@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.14.2
+
+- Reduces loading retry count
+
 ## version 0.14.1
 
 - [fix] task logging did not work
