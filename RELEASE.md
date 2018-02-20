@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.15.0
+
+- [CHANGE] Upgrade AWS-SDK to v3.  This version requires at least Bricolage 5.25.
+
 ## version 0.14.2
 
 - Reduces loading retry count
