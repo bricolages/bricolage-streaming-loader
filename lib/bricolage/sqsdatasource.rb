@@ -1,6 +1,6 @@
 require 'bricolage/datasource'
 require 'securerandom'
-require 'aws-sdk'
+require 'aws-sdk-sqs'
 require 'json'
 require 'time'
 
