@@ -1,3 +1,5 @@
+require 'aws-sdk-s3'
+
 module Bricolage
 
   module StreamingLoad
