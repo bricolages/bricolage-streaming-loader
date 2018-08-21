@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.15.1
+
+- [new] Use the schema name in the parameters table by default (no more "no such variable: XXXX_schema" error).
+
 ## version 0.15.0
 
 - [CHANGE] Upgrade AWS-SDK to v3.  This version requires at least Bricolage 5.25.
