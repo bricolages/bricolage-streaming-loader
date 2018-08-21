@@ -35,7 +35,7 @@ module Bricolage
       end
 
       def JobParams.resolve_schema(ctx, schema)
-        ctx.global_variables["#{schema}_schema"] || schema
+        ctx.global_variables.get_force("#{schema}_schema") || schema
       end
       private_class_method :resolve_schema
 
