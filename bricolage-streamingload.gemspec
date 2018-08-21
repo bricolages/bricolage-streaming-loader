@@ -12,16 +12,15 @@ Gem::Specification.new do |s|
   s.email = ['aamine@loveruby.net']
   s.homepage = 'https://github.com/aamine/bricolage-streamingload'
 
-  s.executables = Dir.entries('bin').select {|ent| File.file?("bin/#{ent}") }
-  s.files = Dir.glob(%w[README.md LICENSE bin/* lib/**/*.rb test/**/*])
+  s.files = `git ls-files -z`.split("\x0").reject {|f| f.match(%r{^(test|spec|features)/}) }
+  s.executables = s.files.grep(%r{bin/}).map {|path| File.basename(path) }
   s.require_path = 'lib'
 
-  s.required_ruby_version = '>= 2.1.0'
-  s.add_dependency 'bricolage', '>= 5.26'
+  s.required_ruby_version = '>= 2.3.0'
+  s.add_dependency 'bricolage', '>= 5.29.2'
   s.add_dependency 'pg', '~> 0.18.0'
-  s.add_dependency 'aws-sdk-s3', '~> 1'
-  s.add_dependency 'aws-sdk-sqs', '~> 1'
+  s.add_dependency 'aws-sdk-s3', '~> 1.8'
+  s.add_dependency 'aws-sdk-sqs', '~> 1.3'
   s.add_development_dependency 'rake'
   s.add_development_dependency 'test-unit'
-  s.add_development_dependency 'pry'
 end
