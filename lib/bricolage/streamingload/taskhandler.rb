@@ -149,12 +149,15 @@ module Bricolage
 
     class NoopJob
 
-      def initialize(context:, ctl_ds:, task_id:, force: false, logger:)
+      def initialize(context:, ctl_ds:, data_ds:, log_table:, task_id:, force: false, logger:)
         @ctx = context
         @ctl_ds = ctl_ds
+        @data_ds = data_ds
+        @log_table = log_table
         @task_id = task_id
         @force = force
         @logger = logger
+        @working_dir = Dir.getwd
       end
 
       def execute(fail_fast: false)
@@ -164,7 +167,7 @@ module Bricolage
       end
 
       def execute_task
-        @logger.info "execute_task: task_id=#{@task_id} force=#{@force} ctx=#{@ctx.home_path} ctl_ds=#{@ctl_ds.name} dir=#{@working_dir}"
+        @logger.info "execute_task: task_id=#{@task_id} force=#{@force} ctx=#{@ctx.home_path} ctl_ds=#{@ctl_ds.name} data_ds=#{@data_ds.name} dir=#{@working_dir}"
       end
 
     end
