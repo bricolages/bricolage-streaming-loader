@@ -28,7 +28,7 @@ ARGF.each do |line|
       },
       object: {
         key: key,
-        size: 1
+        size: 0
       }
     },
     noDispatch: no_dispatch
