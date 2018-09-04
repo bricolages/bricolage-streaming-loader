@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.15.2
+
+- [fix] send-data-event: Send objectSize=0 to indicate this message is fake.
+
 ## version 0.15.1
 
 - [new] Use the schema name in the parameters table by default (no more "no such variable: XXXX_schema" error).
