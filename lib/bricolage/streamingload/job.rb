@@ -126,7 +126,11 @@ module Bricolage
           raise
         rescue JobError => ex
           ctl.open {
-            ctl.abort_job job_id, 'error', ex.message.lines.first.strip
+            fail_count = @task.failure_count
+            final_retry = (fail_count >= MAX_RETRY)
+            retry_msg = (fail_count > 0) ? "(retry\##{fail_count}#{final_retry ? ' FINAL' : ''}) " : ''
+            ctl.abort_job job_id, 'error', retry_msg + ex.message.lines.first.strip
+            raise JobCancelled, "retry count exceeds limit: task_id=#{@task_id}" if final_retry
           }
           raise
         rescue Exception => ex
