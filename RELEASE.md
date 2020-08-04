@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.16.1
+
+- [fix] Stop retrying after 2 times retried (total 3 trial).
+
 ## version 0.16.0
 
 - [new] Retry for also error tasks, not only failure tasks.
