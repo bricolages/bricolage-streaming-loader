@@ -63,7 +63,7 @@ module Bricolage
         return false
       rescue JobError => ex
         @logger.error ex.message
-        return true
+        return false
       rescue Exception => ex
         @logger.exception ex
         return true
