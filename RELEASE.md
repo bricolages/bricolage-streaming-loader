@@ -1,5 +1,12 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.16.0
+
+- [new] Retry for also error tasks, not only failure tasks.
+  Error tasks are assumed as "non-retriable" e.g. DB login error, but some of them are really able to be resolved
+  by retrying on ECS environment. Retrying is not expensive (and human operation is relatively expensive),
+  we'll retry on all failures and errors.
+
 ## version 0.15.2
 
 - [fix] send-data-event: Send objectSize=0 to indicate this message is fake.
