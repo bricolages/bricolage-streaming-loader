@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.17.0
+
+- [new] Introduces Sentry error reporting.  Define SENTRY_DSN environment variable to enable it.
+
 ## version 0.16.1
 
 - [fix] Stop retrying after 2 times retried (total 3 trial).
