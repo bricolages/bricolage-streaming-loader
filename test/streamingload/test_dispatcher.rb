@@ -68,7 +68,7 @@ module Bricolage
           conn.update("truncate strload_objects")
           conn.update("truncate strload_task_objects")
           conn.update("truncate strload_tasks")
-          conn.update("insert into strload_tables values (1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false)")
+          conn.update("insert into strload_tables values (1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false, 'test-bucket', 'test-prefix')")
         }
         dispatcher.event_loop
 
@@ -167,9 +167,9 @@ module Bricolage
           conn.update("truncate strload_objects")
           conn.update("truncate strload_task_objects")
           conn.update("truncate strload_tasks")
-          conn.update("insert into strload_tables values (1, 'testschema.aaa', 'testschema', 'aaa', 100, 1800, false)")
-          conn.update("insert into strload_tables values (2, 'testschema.bbb', 'testschema', 'bbb', 100, 1800, false)")
-          conn.update("insert into strload_tables values (3, 'testschema.ccc', 'testschema', 'ccc', 100, 1800, false)")
+          conn.update("insert into strload_tables values (1, 'testschema.aaa', 'testschema', 'aaa', 100, 1800, false, 'test-bucket', 'test-prefix')")
+          conn.update("insert into strload_tables values (2, 'testschema.bbb', 'testschema', 'bbb', 100, 1800, false, 'test-bucket', 'test-prefix')")
+          conn.update("insert into strload_tables values (3, 'testschema.ccc', 'testschema', 'ccc', 100, 1800, false, 'test-bucket', 'test-prefix')")
         }
         dispatcher.event_loop
 

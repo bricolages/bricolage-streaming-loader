@@ -10,8 +10,9 @@ require 'bricolage/streamingload/chunkbuffer'
 require 'bricolage/streamingload/loadtasklogger'
 require 'bricolage/streamingload/alertinglogger'
 require 'yaml'
-require 'optparse'
 require 'fileutils'
+require 'raven'
+require 'optparse'
 
 module Bricolage
 
@@ -20,6 +21,12 @@ module Bricolage
     class Dispatcher < SQSDataSource::MessageHandler
 
       def Dispatcher.main
+        Raven.capture {
+          _main
+        }
+      end
+
+      def Dispatcher._main
         opts = DispatcherOptions.new(ARGV)
         opts.parse
         unless opts.rest_arguments.size == 1
