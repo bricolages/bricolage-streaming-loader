@@ -17,10 +17,11 @@ Gem::Specification.new do |s|
   s.require_path = 'lib'
 
   s.required_ruby_version = '>= 2.3.0'
-  s.add_dependency 'bricolage', '>= 5.29.2'
+  s.add_dependency 'bricolage', '~> 5.30'
   s.add_dependency 'pg', '~> 0.18.0'
   s.add_dependency 'aws-sdk-s3', '~> 1.8'
   s.add_dependency 'aws-sdk-sqs', '~> 1.3'
+  s.add_dependency 'sentry-raven', '~> 3.0'
   s.add_development_dependency 'rake'
   s.add_development_dependency 'test-unit'
 end
