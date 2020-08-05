@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.17.1
+
+- [new][tmp] Sends a message to Sentry on start-up.
+
 ## version 0.17.0
 
 - [new] Introduces Sentry error reporting.  Define SENTRY_DSN environment variable to enable it.
