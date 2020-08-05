@@ -3,6 +3,7 @@ require 'bricolage/streamingload/manifest'
 require 'bricolage/sqlutils'
 require 'socket'
 require 'json'
+require 'raven'
 
 module Bricolage
 
@@ -44,7 +45,8 @@ module Bricolage
       def execute(fail_fast: false)
         execute_task
         return true
-      rescue JobCancelled
+      rescue JobCancelled => ex
+        Raven.capture_exception(ex)
         return true
       rescue JobDuplicated
         return true
@@ -52,20 +54,25 @@ module Bricolage
         return false
       rescue ControlConnectionFailed => ex
         @logger.error ex.message
+        Raven.capture_exception(ex)
         wait_for_connection('ctl', @ctl_ds) unless fail_fast
         return false
       rescue DataConnectionFailed => ex
         @logger.error ex.message
+        Raven.capture_exception(ex)
         wait_for_connection('data', @data_ds) unless fail_fast
         return false
       rescue JobFailure => ex
         @logger.error ex.message
+        Raven.capture_exception(ex)
         return false
       rescue JobError => ex
         @logger.error ex.message
+        Raven.capture_exception(ex)
         return false
       rescue Exception => ex
         @logger.exception ex
+        Raven.capture_exception(ex)
         return true
       end
 
