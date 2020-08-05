@@ -17,7 +17,7 @@ module Bricolage
 
       test "execute_task" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false]
+          db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [1, 'streaming_load_v3', 1, current_timestamp]
           db.insert_into 'strload_task_objects', [1, 1], [1, 2]
           db.insert_into 'strload_objects',
@@ -43,7 +43,7 @@ module Bricolage
 
       test "execute_task (with work table)" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.with_work_table', 'testschema', 'with_work_table', 100, 1800, false]
+          db.insert_into 'strload_tables', [1, 'testschema.with_work_table', 'testschema', 'with_work_table', 100, 1800, false, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [11, 'streaming_load_v3', 1, current_timestamp]
           db.insert_into 'strload_task_objects', [11, 1001], [11, 1002]
           db.insert_into 'strload_objects',
@@ -71,7 +71,7 @@ module Bricolage
 
       test "execute_task (disabled)" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, true]
+          db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, true, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [1, 'streaming_load_v3', 1, current_timestamp]
 
           job = new_job(task_id: 1, force: false)
@@ -85,7 +85,7 @@ module Bricolage
 
       test "execute_task (duplicated)" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false]
+          db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [1, 'streaming_load_v3', 1, current_timestamp]
           db.insert_into 'strload_jobs',
             [1, 1, 'localhost-1234', 'failure', current_timestamp, current_timestamp, ''],
@@ -101,7 +101,7 @@ module Bricolage
 
       test "execute_task (duplicated but forced)" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false]
+          db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [11, 'streaming_load_v3', 1, current_timestamp]
           db.insert_into 'strload_task_objects', [11, 1001], [11, 1002]
           db.insert_into 'strload_objects',
@@ -128,7 +128,7 @@ module Bricolage
 
       test "execute_task (load fails / first time)" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.sql_fails', 'testschema', 'sql_fails', 100, 1800, false]
+          db.insert_into 'strload_tables', [1, 'testschema.sql_fails', 'testschema', 'sql_fails', 100, 1800, false, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [11, 'streaming_load_v3', 1, current_timestamp]
           db.insert_into 'strload_task_objects', [11, 1001], [11, 1002]
           db.insert_into 'strload_objects',
@@ -154,7 +154,7 @@ module Bricolage
 
       test "execute_task (load fails / nth time)" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.sql_fails', 'testschema', 'sql_fails', 100, 1800, false]
+          db.insert_into 'strload_tables', [1, 'testschema.sql_fails', 'testschema', 'sql_fails', 100, 1800, false, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [11, 'streaming_load_v3', 1, current_timestamp]
           db.insert_into 'strload_task_objects', [11, 1001], [11, 1002]
           db.insert_into 'strload_objects',
@@ -183,7 +183,7 @@ module Bricolage
 
       test "execute_task (too many retry)" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.sql_fails', 'testschema', 'sql_fails', 100, 1800, false]
+          db.insert_into 'strload_tables', [1, 'testschema.sql_fails', 'testschema', 'sql_fails', 100, 1800, false, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [11, 'streaming_load_v3', 1, current_timestamp]
           db.insert_into 'strload_task_objects', [11, 1001], [11, 1002]
           db.insert_into 'strload_objects',
@@ -216,7 +216,7 @@ module Bricolage
 
       test "execute_task (job error)" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.job_error', 'testschema', 'job_error', 100, 1800, false]
+          db.insert_into 'strload_tables', [1, 'testschema.job_error', 'testschema', 'job_error', 100, 1800, false, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [11, 'streaming_load_v3', 1, current_timestamp]
           db.insert_into 'strload_task_objects', [11, 1001], [11, 1002]
           db.insert_into 'strload_objects',
@@ -242,7 +242,7 @@ module Bricolage
 
       test "execute_task (unexpected error)" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.unexpected_error', 'testschema', 'unexpected_error', 100, 1800, false]
+          db.insert_into 'strload_tables', [1, 'testschema.unexpected_error', 'testschema', 'unexpected_error', 100, 1800, false, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [11, 'streaming_load_v3', 1, current_timestamp]
           db.insert_into 'strload_task_objects', [11, 1001], [11, 1002]
           db.insert_into 'strload_objects',
@@ -268,7 +268,7 @@ module Bricolage
 
       test "execute_task (load error)" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.load_error', 'testschema', 'load_error', 100, 1800, false]
+          db.insert_into 'strload_tables', [1, 'testschema.load_error', 'testschema', 'load_error', 100, 1800, false, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [11, 'streaming_load_v3', 1, current_timestamp]
           db.insert_into 'strload_task_objects', [11, 1001], [11, 1002]
           db.insert_into 'strload_objects',
@@ -295,7 +295,7 @@ module Bricolage
 
       test "execute_task (unknown status, really=success)" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false]
+          db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [11, 'streaming_load_v3', 1, current_timestamp]
           db.insert_into 'strload_jobs',
             [101, 11, 'localhost-1234', 'unknown', current_timestamp, current_timestamp, 'data connection failed']
@@ -313,7 +313,7 @@ module Bricolage
 
       test "execute_task (unknown status, really=failure)" do
         setup_context {|db|
-          db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false]
+          db.insert_into 'strload_tables', [1, 'testschema.desttable', 'testschema', 'desttable', 100, 1800, false, 'test-bucket', 'test-prefix']
           db.insert_into 'strload_tasks', [11, 'streaming_load_v3', 1, current_timestamp]
           db.insert_into 'strload_task_objects', [11, 1001], [11, 1002]
           db.insert_into 'strload_objects',
