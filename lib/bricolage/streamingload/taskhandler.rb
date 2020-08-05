@@ -7,6 +7,7 @@ require 'bricolage/logger'
 require 'bricolage/exception'
 require 'bricolage/version'
 require 'yaml'
+require 'raven'
 require 'optparse'
 
 module Bricolage
@@ -16,6 +17,8 @@ module Bricolage
     class TaskHandler < SQSDataSource::MessageHandler
 
       def TaskHandler.main
+        Raven.capture_message("loader start")
+
         opts = TaskHandlerOptions.new(ARGV)
         opts.parse
         unless opts.rest_arguments.size <= 1

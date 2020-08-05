@@ -21,6 +21,7 @@ module Bricolage
     class Dispatcher < SQSDataSource::MessageHandler
 
       def Dispatcher.main
+        Raven.capture_message("dispatcher start")
         Raven.capture {
           _main
         }
