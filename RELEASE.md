@@ -1,5 +1,9 @@
 # Bricolage Streaming Load Release Note
 
+## version 0.17.2
+
+- [fix] Relax dependency gem versions
+
 ## version 0.17.1
 
 - [new][tmp] Sends a message to Sentry on start-up.
