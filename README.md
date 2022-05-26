@@ -1,3 +1,5 @@
+**This application is deprecated.  Check cookpad/prism for Redshift streaming loader**
+
 # Bricolage Streaming Load
 
 Streaming load daemon based on Bricolage.
